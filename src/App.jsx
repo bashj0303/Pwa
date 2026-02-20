@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Activity, 
@@ -12,7 +13,8 @@ import {
   Download,
   Plus,
   Trash2,
-  Globe
+  Globe,
+  Share
 } from 'lucide-react';
 
 const App = () => {
@@ -22,8 +24,6 @@ const App = () => {
     return saved ? JSON.parse(saved) : defaultValue;
   };
 
-  // --- ÉTAT MULTILINGUE (EN/FR) ---
-  // Anglais natif par défaut
   const [lang, setLang] = useState(() => loadState('pos_lang', 'en'));
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const App = () => {
   // --- DICTIONNAIRE (i18n) ---
   const translations = {
     en: {
-      appTitle: 'Performance OS',
+      appTitle: 'Grindup.pro',
       tabDashboard: 'Overview',
       tabBudget: 'Budget',
       tabWorkout: 'Training',
@@ -46,6 +46,9 @@ const App = () => {
       installApp: 'Install App',
       installDesc: 'Quick access from home screen',
       installBtn: 'Add',
+      installIOS: 'To install on iPhone:',
+      step1: '1. Tap the Share icon below',
+      step2: '2. Select "Add to Home Screen"',
       close: 'Close',
       budgetLeft: 'Budget Remaining',
       biohacking: 'Biohacking & Habits',
@@ -81,7 +84,7 @@ const App = () => {
       semaxNote: 'Nootropic: 200-500mcg',
     },
     fr: {
-      appTitle: 'Performance OS',
+      appTitle: 'Grindup.pro',
       tabDashboard: 'Aperçu',
       tabBudget: 'Budget',
       tabWorkout: 'Training',
@@ -90,10 +93,13 @@ const App = () => {
       premiumDesc: 'Débloquez la synchro cloud, les protocoles avancés et l\'export.',
       subscribe: 'S\'abonner',
       cancel: 'Annuler',
-      mois: 'mois',
+      month: 'mois',
       installApp: 'Installer l\'application',
       installDesc: 'Accès rapide depuis l\'écran d\'accueil',
       installBtn: 'Ajouter',
+      installIOS: 'Pour installer sur iPhone :',
+      step1: '1. Touchez l\'icône Partager en bas',
+      step2: '2. Choisissez "Sur l\'écran d\'accueil"',
       close: 'Fermer',
       budgetLeft: 'Budget Restant',
       biohacking: 'Biohacking & Habitudes',
@@ -131,15 +137,64 @@ const App = () => {
   };
 
   const t = translations[lang];
+  const toggleLanguage = () => setLang(lang === 'en' ? 'fr' : 'en');
 
-  const toggleLanguage = () => {
-    setLang(lang === 'en' ? 'fr' : 'en');
+  // --- LOGIQUE D'INSTALLATION PWA (INTELLIGENTE & AVEC MÉMOIRE) ---
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isIOS, setIsIOS] = useState(false);
+  
+  const [showInstallPrompt, setShowInstallPrompt] = useState(() => {
+    return localStorage.getItem('pos_hide_prompt') !== 'true';
+  });
+
+  useEffect(() => {
+    if (localStorage.getItem('pos_hide_prompt') === 'true') return;
+
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    
+    if (isStandalone) {
+      setShowInstallPrompt(false);
+      localStorage.setItem('pos_hide_prompt', 'true');
+      return;
+    }
+
+    const ua = window.navigator.userAgent;
+    const isIOSDevice = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i) || (!!ua.match(/Macintosh/i) && 'ontouchend' in document);
+    
+    if (isIOSDevice) {
+      setIsIOS(true);
+      setShowInstallPrompt(true);
+    }
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const dismissPrompt = () => {
+    setShowInstallPrompt(false);
+    localStorage.setItem('pos_hide_prompt', 'true');
+  };
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        dismissPrompt();
+      }
+      setDeferredPrompt(null);
+    }
   };
 
   // --- ÉTATS GLOBAUX ---
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPremium, setShowPremium] = useState(false);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(true);
 
   const [balance, setBalance] = useState(() => loadState('pos_balance', 3350));
   const [expenses, setExpenses] = useState(() => loadState('pos_expenses', [
@@ -459,7 +514,6 @@ const App = () => {
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-[#ccff00] selection:text-black flex justify-center">
       <div className="w-full max-w-md bg-[#0f172a] min-h-screen relative shadow-2xl flex flex-col border-x border-slate-800/50">
         
-        {/* NOUVEAU HEADER (Bouton de langue mieux placé) */}
         <header className="px-6 pt-10 pb-4 flex justify-between items-center bg-[#0f172a]/95 backdrop-blur-md z-40 sticky top-0 border-b border-slate-800/80">
           <div>
             <p className="text-3xl font-black text-white capitalize tracking-tight">
@@ -483,19 +537,34 @@ const App = () => {
           </div>
         </header>
 
-        {/* Bannière d'installation PWA */}
+        {/* BANNIÈRE D'INSTALLATION INTELLIGENTE */}
         {showInstallPrompt && (
-          <div className="bg-[#ccff00] text-black px-4 py-3 flex justify-between items-center rounded-2xl mx-4 mt-4 shadow-lg animate-in slide-in-from-top duration-500">
-            <div className="flex items-center gap-3">
-              <div className="bg-black/10 p-2 rounded-xl text-black"><Download size={18} /></div>
-              <div>
-                <p className="font-bold text-sm leading-tight">{t.installApp}</p>
-                <p className="text-[10px] opacity-80 font-medium">{t.installDesc}</p>
+          <div className="bg-[#ccff00] text-black p-4 rounded-2xl mx-4 mt-4 shadow-lg animate-in slide-in-from-top duration-500 relative">
+            <button onClick={dismissPrompt} className="absolute top-2 right-2 p-1 opacity-50 hover:opacity-100">
+              <Trash2 size={14} />
+            </button>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-black/10 p-2 rounded-xl text-black mt-1"><Download size={20} /></div>
+              <div className="flex-1">
+                <p className="font-bold text-sm mb-1">{t.installApp}</p>
+                
+                {isIOS ? (
+                  <div className="space-y-1 text-xs font-medium opacity-80">
+                    <p>{t.installIOS}</p>
+                    <p className="flex items-center gap-1">{t.step1} <Share size={12} /></p>
+                    <p>{t.step2}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[10px] opacity-80 font-medium mb-3">{t.installDesc}</p>
+                    <button onClick={handleInstallClick} className="w-full bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:scale-[1.02] transition-transform">
+                      {t.installBtn}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-            <button onClick={() => setShowInstallPrompt(false)} className="bg-black text-white text-xs font-bold px-4 py-2 rounded-xl hover:scale-105 transition-transform">
-              {t.installBtn}
-            </button>
           </div>
         )}
 
