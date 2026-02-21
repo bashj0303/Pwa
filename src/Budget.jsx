@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { Plus, Trash2, Save, Check } from 'lucide-react';
 
 const Budget = ({ t }) => {
   const isFr = t.month === 'mois';
 
+  // Dictionnaire local incluant les catégories par défaut
   const vocab = {
     title: isFr ? '📈 Budget 2026' : '📈 Budget 2026',
     save: isFr ? 'SAUVEGARDER' : 'SAVE',
@@ -22,36 +24,47 @@ const Budget = ({ t }) => {
     total: 'Total',
     max: 'Max',
     fixedTitle: isFr ? '🔒 Charges Fixes' : '🔒 Fixed Costs',
-    namePrompt: isFr ? 'Nom ?' : 'Name?'
+    namePrompt: isFr ? 'Nom ?' : 'Name?',
+    
+    // Noms des catégories par défaut (dynamiques)
+    catSavings: isFr ? 'Épargne' : 'Savings',
+    catInv: isFr ? 'Investissement' : 'Investment',
+    catGroc: isFr ? 'Épicerie' : 'Groceries',
+    catGas: isFr ? 'Essence' : 'Gas',
+    catResto: isFr ? 'Resto' : 'Restaurants',
+    catHome: isFr ? 'Divers Maison' : 'Home Misc',
+    catLeisure: isFr ? 'Sortie / Loisirs' : 'Entertainment',
+    catHealth: isFr ? 'Perso / Santé' : 'Health & Personal',
+    catRent: isFr ? '🏠 Loyer' : '🏠 Rent',
+    catPhone: isFr ? '📱 Cellulaire' : '📱 Phone',
   };
 
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [showSaved, setShowSaved] = useState(false);
 
-  // Charger les données (Nouvelle clé V2 pour forcer la mise à jour bilingue)
+  // V3: On utilise des "nameKey" pour forcer la traduction en direct des items par défaut
   const loadMonthData = (monthIndex) => {
-    const saved = localStorage.getItem(`pos_budget_v2_m${monthIndex}`);
+    const saved = localStorage.getItem(`pos_budget_v3_m${monthIndex}`);
     if (saved) return JSON.parse(saved);
     
-    // Valeurs par défaut générées selon la langue actuelle !
     return {
       incomeBase: 0,
       incomeTS: 0,
       autoTransfers: [
-        { id: 20, name: isFr ? 'Épargne' : 'Savings', amount: 0 },
-        { id: 21, name: isFr ? 'Investissement' : 'Investment', amount: 0 }
+        { id: 20, nameKey: 'catSavings', amount: 0 },
+        { id: 21, nameKey: 'catInv', amount: 0 }
       ],
       variables: [
-        { id: 1, name: isFr ? 'Épicerie' : 'Groceries', spent: 0, max: 0 },
-        { id: 2, name: isFr ? 'Essence' : 'Gas', spent: 0, max: 0 },
-        { id: 3, name: isFr ? 'Resto' : 'Restaurants', spent: 0, max: 0 },
-        { id: 4, name: isFr ? 'Divers Maison' : 'Home Misc', spent: 0, max: 0 },
-        { id: 5, name: isFr ? 'Sortie / Loisirs' : 'Entertainment', spent: 0, max: 0 },
-        { id: 6, name: isFr ? 'Perso / Santé' : 'Health & Personal', spent: 0, max: 0 },
+        { id: 1, nameKey: 'catGroc', spent: 0, max: 0 },
+        { id: 2, nameKey: 'catGas', spent: 0, max: 0 },
+        { id: 3, nameKey: 'catResto', spent: 0, max: 0 },
+        { id: 4, nameKey: 'catHome', spent: 0, max: 0 },
+        { id: 5, nameKey: 'catLeisure', spent: 0, max: 0 },
+        { id: 6, nameKey: 'catHealth', spent: 0, max: 0 },
       ],
       fixed: [
-        { id: 10, name: isFr ? '🏠 Loyer' : '🏠 Rent', amount: 0 },
-        { id: 12, name: isFr ? '📱 Cellulaire' : '📱 Phone', amount: 0 },
+        { id: 10, nameKey: 'catRent', amount: 0 },
+        { id: 12, nameKey: 'catPhone', amount: 0 },
       ]
     };
   };
@@ -59,7 +72,7 @@ const Budget = ({ t }) => {
   const [monthData, setMonthData] = useState(() => loadMonthData(activeMonth));
 
   const handleSave = () => {
-    localStorage.setItem(`pos_budget_v2_m${activeMonth}`, JSON.stringify(monthData));
+    localStorage.setItem(`pos_budget_v3_m${activeMonth}`, JSON.stringify(monthData));
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
   };
@@ -73,7 +86,7 @@ const Budget = ({ t }) => {
   // --- CALCULS ---
   const totalIncome = Number(monthData.incomeBase) + Number(monthData.incomeTS);
   const autoTransferPerPay = monthData.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0);
-  const totalAutoTransferMonthly = autoTransferPerPay * 2; // X2 pour 2 paies par mois
+  const totalAutoTransferMonthly = autoTransferPerPay * 2;
   const totalFixed = monthData.fixed.reduce((sum, item) => sum + Number(item.amount), 0);
   const totalVariablesSpent = monthData.variables.reduce((sum, item) => sum + Number(item.spent), 0);
   
@@ -94,6 +107,7 @@ const Budget = ({ t }) => {
     if (name) {
       setMonthData(prev => ({
         ...prev,
+        // Un item ajouté par l'utilisateur a un "name" brut, pas de "nameKey"
         [listName]: [...prev[listName], { ...defaultItem, id: Date.now(), name }]
       }));
     }
@@ -184,7 +198,9 @@ const Budget = ({ t }) => {
         <div className="space-y-1.5">
           {monthData.autoTransfers.map(a => (
             <div key={a.id} className="flex items-center bg-black/20 p-1.5 rounded-lg border border-slate-700/30">
-              <span className="text-xs font-bold text-slate-300 flex-1 ml-1 truncate">{a.name}</span>
+              <span className="text-xs font-bold text-slate-300 flex-1 ml-1 truncate">
+                {a.nameKey ? vocab[a.nameKey] : a.name}
+              </span>
               <input 
                 type="number" placeholder="0" value={a.amount === 0 ? '' : a.amount} 
                 onChange={e => updateListItem('autoTransfers', a.id, 'amount', e.target.value)} 
@@ -213,7 +229,9 @@ const Budget = ({ t }) => {
             return (
               <div key={v.id} className="bg-slate-800/40 border border-slate-700/50 p-2.5 rounded-xl">
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="font-bold text-white text-xs">{v.name}</span>
+                  <span className="font-bold text-white text-xs">
+                    {v.nameKey ? vocab[v.nameKey] : v.name}
+                  </span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-black ${isOver ? 'text-red-400' : 'text-emerald-400'}`}>
                       {vocab.left}: {left} $
@@ -235,7 +253,8 @@ const Budget = ({ t }) => {
                   </div>
                   
                   <button onClick={() => {
-                    const add = prompt(`+ ${v.name} ?`, "10");
+                    const itemName = v.nameKey ? vocab[v.nameKey] : v.name;
+                    const add = prompt(`+ ${itemName} ?`, "10");
                     if(add) addVariableAmount(v.id, Number(add));
                   }} className="w-7 h-7 bg-[#ccff00]/10 text-[#ccff00] rounded-md flex items-center justify-center font-black text-sm hover:bg-[#ccff00] hover:text-black">
                     +
@@ -268,7 +287,9 @@ const Budget = ({ t }) => {
         <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden divide-y divide-slate-700/50">
           {monthData.fixed.map(f => (
             <div key={f.id} className="p-2.5 flex justify-between items-center">
-              <span className="font-bold text-slate-300 text-xs truncate flex-1">{f.name}</span>
+              <span className="font-bold text-slate-300 text-xs truncate flex-1">
+                {f.nameKey ? vocab[f.nameKey] : f.name}
+              </span>
               <div className="flex items-center gap-2">
                 <input 
                   type="number" placeholder="0" value={f.amount === 0 ? '' : f.amount} 
