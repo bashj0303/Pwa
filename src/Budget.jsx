@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Save, Check } from 'lucide-react';
 
 const Budget = ({ t }) => {
-  // Astuce pour lier la langue directement avec ton bouton principal dans App.js
   const isFr = t.month === 'mois';
 
   const vocab = {
@@ -29,28 +28,30 @@ const Budget = ({ t }) => {
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [showSaved, setShowSaved] = useState(false);
 
-  // Charger les données du mois actif (tout à 0 par défaut)
+  // Charger les données (Nouvelle clé V2 pour forcer la mise à jour bilingue)
   const loadMonthData = (monthIndex) => {
-    const saved = localStorage.getItem(`pos_budget_m${monthIndex}`);
+    const saved = localStorage.getItem(`pos_budget_v2_m${monthIndex}`);
     if (saved) return JSON.parse(saved);
+    
+    // Valeurs par défaut générées selon la langue actuelle !
     return {
       incomeBase: 0,
       incomeTS: 0,
       autoTransfers: [
-        { id: 20, name: 'Épargne', amount: 0 },
-        { id: 21, name: 'Investissement', amount: 0 }
+        { id: 20, name: isFr ? 'Épargne' : 'Savings', amount: 0 },
+        { id: 21, name: isFr ? 'Investissement' : 'Investment', amount: 0 }
       ],
       variables: [
-        { id: 1, name: 'Épicerie', spent: 0, max: 0 },
-        { id: 2, name: 'Essence', spent: 0, max: 0 },
-        { id: 3, name: 'Resto', spent: 0, max: 0 },
-        { id: 4, name: 'Divers Maison', spent: 0, max: 0 },
-        { id: 5, name: 'Sortie / Loisirs', spent: 0, max: 0 },
-        { id: 6, name: 'Perso / Santé', spent: 0, max: 0 },
+        { id: 1, name: isFr ? 'Épicerie' : 'Groceries', spent: 0, max: 0 },
+        { id: 2, name: isFr ? 'Essence' : 'Gas', spent: 0, max: 0 },
+        { id: 3, name: isFr ? 'Resto' : 'Restaurants', spent: 0, max: 0 },
+        { id: 4, name: isFr ? 'Divers Maison' : 'Home Misc', spent: 0, max: 0 },
+        { id: 5, name: isFr ? 'Sortie / Loisirs' : 'Entertainment', spent: 0, max: 0 },
+        { id: 6, name: isFr ? 'Perso / Santé' : 'Health & Personal', spent: 0, max: 0 },
       ],
       fixed: [
-        { id: 10, name: '🏠 Loyer', amount: 0 },
-        { id: 12, name: '📱 Cellulaire', amount: 0 },
+        { id: 10, name: isFr ? '🏠 Loyer' : '🏠 Rent', amount: 0 },
+        { id: 12, name: isFr ? '📱 Cellulaire' : '📱 Phone', amount: 0 },
       ]
     };
   };
@@ -58,7 +59,7 @@ const Budget = ({ t }) => {
   const [monthData, setMonthData] = useState(() => loadMonthData(activeMonth));
 
   const handleSave = () => {
-    localStorage.setItem(`pos_budget_m${activeMonth}`, JSON.stringify(monthData));
+    localStorage.setItem(`pos_budget_v2_m${activeMonth}`, JSON.stringify(monthData));
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
   };
