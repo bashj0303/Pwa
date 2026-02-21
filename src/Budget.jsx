@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Save, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Save, Check, PieChart, Target, BarChart3 } from 'lucide-react';
 
 const Budget = ({ t }) => {
   const isFr = t.month === 'mois';
+  const currentYear = new Date().getFullYear();
 
-  // Dictionnaire local incluant les catégories par défaut
   const vocab = {
-    title: isFr ? '📈 Budget 2026' : '📈 Budget 2026',
+    title: `📈 Budget ${currentYear}`,
     save: isFr ? 'SAUVEGARDER' : 'SAVE',
     saved: isFr ? 'SAUVEGARDÉ!' : 'SAVED!',
     months: isFr 
@@ -23,10 +23,8 @@ const Budget = ({ t }) => {
     total: 'Total',
     max: 'Max',
     fixedTitle: isFr ? '🔒 Charges Fixes' : '🔒 Fixed Costs',
-    // Ajout d'une petite astuce pour les emojis !
     namePrompt: isFr ? 'Nom ? (Astuce: mets un emoji 🍕 au début)' : 'Name? (Tip: put an emoji 🍕 first)',
     
-    // Noms des catégories par défaut (dynamiques)
     catSavings: isFr ? '💰 Épargne' : '💰 Savings',
     catInv: isFr ? '📈 Investissement' : '📈 Investment',
     catGroc: isFr ? '🛒 Épicerie' : '🛒 Groceries',
@@ -37,12 +35,33 @@ const Budget = ({ t }) => {
     catHealth: isFr ? '💊 Perso / Santé' : '💊 Health & Personal',
     catRent: isFr ? '🏠 Loyer' : '🏠 Rent',
     catPhone: isFr ? '📱 Cellulaire' : '📱 Phone',
+
+    // Vocabulaire Sommaire et Objectifs
+    goalTitle: isFr ? '🎯 Objectif Annuel (Épargne/Investissement)' : '🎯 Yearly Goal (Savings/Investments)',
+    goalPrompt: isFr ? 'Quel est ton objectif annuel en $ ?' : 'What is your yearly goal in $?',
+    summaryMonth: isFr ? 'Sommaire du Mois' : 'Monthly Summary',
+    summaryYear: isFr ? 'Sommaire de l\'Année' : 'Yearly Summary',
+    btnMonth: isFr ? 'Mois' : 'Month',
+    btnYear: isFr ? 'Année' : 'Year',
+    sumIncome: isFr ? 'Revenus' : 'Income',
+    sumSaved: isFr ? 'Mis de côté' : 'Saved',
+    sumFixed: isFr ? 'Charges Fixes' : 'Fixed Costs',
+    sumVar: isFr ? 'Variables' : 'Variables',
+    sumTotalOut: isFr ? 'Total Sortant' : 'Total Outgoing',
   };
 
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [showSaved, setShowSaved] = useState(false);
+  const [summaryView, setSummaryView] = useState('month'); // 'month' ou 'year'
 
-  // V3: On utilise des "nameKey" pour forcer la traduction en direct des items par défaut
+  // Objectif Annuel
+  const [yearlyGoal, setYearlyGoal] = useState(() => {
+    const saved = localStorage.getItem('pos_yearly_goal_v1');
+    return saved ? Number(saved) : 5000;
+  });
+
+  useEffect(() => localStorage.setItem('pos_yearly_goal_v1', yearlyGoal.toString()), [yearlyGoal]);
+
   const loadMonthData = (monthIndex) => {
     const saved = localStorage.getItem(`pos_budget_v3_m${monthIndex}`);
     if (saved) return JSON.parse(saved);
@@ -83,14 +102,36 @@ const Budget = ({ t }) => {
     setMonthData(loadMonthData(index));
   };
 
-  // --- CALCULS ---
+  // --- CALCULS DU MOIS ACTUEL ---
   const totalIncome = Number(monthData.incomeBase) + Number(monthData.incomeTS);
   const autoTransferPerPay = monthData.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0);
   const totalAutoTransferMonthly = autoTransferPerPay * 2;
   const totalFixed = monthData.fixed.reduce((sum, item) => sum + Number(item.amount), 0);
   const totalVariablesSpent = monthData.variables.reduce((sum, item) => sum + Number(item.spent), 0);
   
-  const pocketMoney = totalIncome - totalAutoTransferMonthly - totalFixed - totalVariablesSpent;
+  const totalOutgoing = totalAutoTransferMonthly + totalFixed + totalVariablesSpent;
+  const pocketMoney = totalIncome - totalOutgoing;
+
+  // --- CALCULS DE L'ANNÉE COMPLÈTE ---
+  let yearlyIncome = 0;
+  let yearlySaved = 0;
+  let yearlyFixed = 0;
+  let yearlyVar = 0;
+
+  for (let i = 0; i < 12; i++) {
+    // Prendre les données en direct pour le mois actif, ou lire la sauvegarde pour les autres mois
+    const dataToCalculate = (i === activeMonth) ? monthData : loadMonthData(i);
+    
+    yearlyIncome += Number(dataToCalculate.incomeBase) + Number(dataToCalculate.incomeTS);
+    yearlySaved += dataToCalculate.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0) * 2;
+    yearlyFixed += dataToCalculate.fixed.reduce((sum, item) => sum + Number(item.amount), 0);
+    yearlyVar += dataToCalculate.variables.reduce((sum, item) => sum + Number(item.spent), 0);
+  }
+  
+  const yearlyOutgoing = yearlySaved + yearlyFixed + yearlyVar;
+
+  // Calcul progression objectif
+  const goalProgress = yearlyGoal > 0 ? Math.min((yearlySaved / yearlyGoal) * 100, 100) : 0;
 
   // --- FONCTIONS DE GESTION ---
   const updateData = (key, value) => setMonthData(prev => ({ ...prev, [key]: value }));
@@ -169,7 +210,6 @@ const Budget = ({ t }) => {
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-slate-800/60 rounded-xl p-2.5 border border-slate-700">
           <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">{vocab.base}</p>
-          {/* Remplacement par text-[16px] pour éviter le zoom iOS */}
           <input 
             type="number" placeholder="0" value={monthData.incomeBase === 0 ? '' : monthData.incomeBase} 
             onChange={(e) => updateData('incomeBase', e.target.value)}
@@ -204,7 +244,7 @@ const Budget = ({ t }) => {
               <input 
                 type="number" placeholder="0" value={a.amount === 0 ? '' : a.amount} 
                 onChange={e => updateListItem('autoTransfers', a.id, 'amount', e.target.value)} 
-                className="bg-transparent text-[#ccff00] font-black w-16 text-right text-[16px] focus:outline-none placeholder-slate-600" 
+                className="bg-transparent text-[#ccff00] font-black w-14 text-right text-[16px] focus:outline-none placeholder-slate-600" 
               />
               <span className="text-[10px] text-slate-500 ml-1">$</span>
               <button onClick={() => deleteListItem('autoTransfers', a.id)} className="text-slate-600 hover:text-red-400 p-1 ml-1"><Trash2 size={12}/></button>
@@ -254,7 +294,7 @@ const Budget = ({ t }) => {
                   
                   <button onClick={() => {
                     const itemName = v.nameKey ? vocab[v.nameKey] : v.name;
-                    const add = prompt(`+ ${itemName} ?`, "10");
+                    const add = prompt(`+ ${itemName} ?`, "");
                     if(add) addVariableAmount(v.id, Number(add));
                   }} className="w-8 h-8 bg-[#ccff00]/10 text-[#ccff00] rounded-md flex items-center justify-center font-black text-sm hover:bg-[#ccff00] hover:text-black">
                     +
@@ -306,6 +346,98 @@ const Budget = ({ t }) => {
         </div>
       </div>
 
+      <div className="pt-4 border-t border-slate-800/80 mt-8 space-y-4">
+        
+        {/* NOUVEAU : OBJECTIF ANNUEL */}
+        <div className="bg-slate-800/40 border border-slate-700 p-4 rounded-2xl">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-white font-bold text-xs flex items-center gap-1.5">
+              <Target size={14} className="text-[#ccff00]" /> {vocab.goalTitle}
+            </h4>
+            <button 
+              onClick={() => {
+                const newGoal = prompt(vocab.goalPrompt, yearlyGoal);
+                if(newGoal) setYearlyGoal(Number(newGoal));
+              }}
+              className="text-[#ccff00] font-black text-xs px-2 py-1 bg-black/30 rounded-lg hover:bg-[#ccff00]/20"
+            >
+              / {yearlyGoal} $
+            </button>
+          </div>
+          <div className="flex justify-between items-end mb-1">
+            <span className="text-[10px] font-bold text-slate-400">{goalProgress.toFixed(1)}%</span>
+            <span className="text-sm font-black text-[#ccff00]">{yearlySaved} $</span>
+          </div>
+          <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+            <div 
+              className="h-full bg-gradient-to-r from-[#ccff00]/50 to-[#ccff00] transition-all duration-700"
+              style={{ width: `${goalProgress}%` }}
+            />
+          </div>
+        </div>
+
+        {/* NOUVEAU : SOMMAIRE AVEC BOUTON BASCULE (MOIS / ANNÉE) */}
+        <div className="bg-slate-900 border border-slate-700 p-5 rounded-[2rem] shadow-xl relative overflow-hidden">
+          <div className="absolute -bottom-10 -right-10 opacity-5 pointer-events-none">
+            <BarChart3 size={140} />
+          </div>
+          
+          <div className="flex justify-between items-center mb-4 relative z-10">
+            <h4 className="text-white font-black text-sm flex items-center gap-2">
+              <PieChart size={16} className="text-[#ccff00]" />
+              {summaryView === 'month' ? vocab.summaryMonth : vocab.summaryYear}
+            </h4>
+            
+            {/* Boutons Bascule */}
+            <div className="flex bg-black/40 p-1 rounded-lg border border-slate-700/50">
+              <button 
+                onClick={() => setSummaryView('month')}
+                className={`text-[9px] font-bold px-3 py-1 rounded-md transition-colors ${summaryView === 'month' ? 'bg-[#ccff00] text-black' : 'text-slate-400 hover:text-white'}`}
+              >
+                {vocab.btnMonth}
+              </button>
+              <button 
+                onClick={() => setSummaryView('year')}
+                className={`text-[9px] font-bold px-3 py-1 rounded-md transition-colors ${summaryView === 'year' ? 'bg-[#ccff00] text-black' : 'text-slate-400 hover:text-white'}`}
+              >
+                {vocab.btnYear}
+              </button>
+            </div>
+          </div>
+          
+          <div className="space-y-2 relative z-10">
+            <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
+              <span className="text-[11px] font-bold text-emerald-400">{vocab.sumIncome}</span>
+              <span className="text-sm font-black text-emerald-400">+{summaryView === 'month' ? totalIncome : yearlyIncome} $</span>
+            </div>
+            
+            <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
+              <span className="text-[11px] font-bold text-[#ccff00]">{vocab.sumSaved}</span>
+              <span className="text-sm font-black text-[#ccff00]">{summaryView === 'month' ? totalAutoTransferMonthly : yearlySaved} $</span>
+            </div>
+
+            <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
+              <span className="text-[11px] font-bold text-slate-300">{vocab.sumFixed}</span>
+              <span className="text-sm font-black text-slate-300">{summaryView === 'month' ? totalFixed : yearlyFixed} $</span>
+            </div>
+
+            <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
+              <span className="text-[11px] font-bold text-slate-300">{vocab.sumVar}</span>
+              <span className="text-sm font-black text-slate-300">{summaryView === 'month' ? totalVariablesSpent : yearlyVar} $</span>
+            </div>
+
+            <div className="h-px w-full bg-slate-700/50 my-3"></div>
+
+            <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-red-500/20">
+              <span className="text-xs font-black text-red-400 uppercase tracking-wider">{vocab.sumTotalOut}</span>
+              <span className="text-base font-black text-red-400">
+                {summaryView === 'month' ? totalOutgoing : yearlyOutgoing} $
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };
