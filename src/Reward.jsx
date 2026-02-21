@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, ShoppingBag, Share2, Camera, Tag, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Gift, ShoppingBag, Share2, Dumbbell, Activity, Wallet, CheckCircle2 } from 'lucide-react';
 
 const Reward = ({ t, xp, setXp }) => {
   const isFr = t.month === 'mois';
 
   const vocab = {
     title: isFr ? 'Grindwear Rewards' : 'Grindwear Rewards',
-    desc: isFr ? 'Transforme ta discipline en vêtements exclusifs.' : 'Turn your discipline into exclusive gear.',
+    desc: isFr ? 'Partage ta discipline. Gagne du merch exclusif.' : 'Share your discipline. Earn exclusive gear.',
     currXp: isFr ? 'XP Actuel' : 'Current XP',
     tier25: '25$ Gift Card',
     tier50: '50$ Gift Card',
@@ -15,100 +15,74 @@ const Reward = ({ t, xp, setXp }) => {
     locked: isFr ? 'Bloqué' : 'Locked',
     claim: isFr ? 'Réclamer' : 'Claim',
     
-    waysToEarn: isFr ? 'Comment gagner des XP ?' : 'How to earn XP?',
+    waysToEarn: isFr ? 'Missions Quotidiennes (Social)' : 'Daily Missions (Social)',
     
-    actionShareTitle: isFr ? 'Partager l\'App' : 'Share the App',
-    actionShareDesc: isFr ? '+50 XP (1x par jour)' : '+50 XP (1x per day)',
-    actionShareBtn: isFr ? 'Partager' : 'Share',
+    shareWorkout: isFr ? 'Partager mon Workout' : 'Share my Workout',
+    shareWorkoutDesc: isFr ? 'Montre ta session du jour (+50 XP)' : 'Flex today\'s session (+50 XP)',
     
-    actionOrderTitle: isFr ? 'Vérifier une Commande' : 'Verify an Order',
-    actionOrderDesc: isFr ? '+1000 XP (Achat Grindwear)' : '+1000 XP (Grindwear purchase)',
-    actionOrderBtn: isFr ? 'Ajouter Numéro' : 'Add Order #',
+    shareHabits: isFr ? 'Partager mes Habitudes' : 'Share my Habits',
+    shareHabitsDesc: isFr ? 'Montre ta constance (+50 XP)' : 'Flex your consistency (+50 XP)',
     
-    actionIgTitle: isFr ? 'Tag nous sur Instagram' : 'Tag us on Instagram',
-    actionIgDesc: isFr ? '+500 XP (Photo en Grindwear)' : '+500 XP (Pic wearing Grindwear)',
-    actionIgBtn: isFr ? 'Soumettre le @' : 'Submit Handle',
+    shareBudget: isFr ? 'Partager mon Budget' : 'Share my Budget',
+    shareBudgetDesc: isFr ? 'Montre ta discipline financière (+50 XP)' : 'Flex your financial discipline (+50 XP)',
 
-    successOrder: isFr ? 'Commande ajoutée !' : 'Order added!',
-    successIg: isFr ? 'En attente de vérification' : 'Pending verification',
-    alreadyShared: isFr ? 'Déjà partagé aujourd\'hui' : 'Already shared today'
+    btnShare: isFr ? 'Partager' : 'Share',
+    btnDone: isFr ? 'Fait aujourd\'hui' : 'Done today',
+    
+    successClaim: isFr 
+      ? "Félicitations ! Prends une capture d'écran et envoie-nous un DM sur Instagram @Grindwear pour ton code !" 
+      : "Congrats! Screenshot this and DM us on Instagram @Grindwear for your code!"
   };
 
-  // --- LOGIQUE ANTI-SCAM ---
-  const [lastShared, setLastShared] = useState(() => localStorage.getItem('pos_last_shared') || null);
-  const [claimedOrders, setClaimedOrders] = useState(() => JSON.parse(localStorage.getItem('pos_orders') || '[]'));
-  const [pendingIg, setPendingIg] = useState(() => localStorage.getItem('pos_pending_ig') || null);
+  // --- LOGIQUE ANTI-SCAM (COOLDOWNS QUOTIDIENS) ---
+  const todayDate = new Date().toDateString();
 
-  useEffect(() => localStorage.setItem('pos_orders', JSON.stringify(claimedOrders)), [claimedOrders]);
+  const [shares, setShares] = useState(() => {
+    const saved = localStorage.getItem('pos_daily_shares');
+    return saved ? JSON.parse(saved) : { workout: null, habits: null, budget: null };
+  });
 
-  const handleShare = async () => {
-    const today = new Date().toDateString();
-    if (lastShared === today) {
-      alert(vocab.alreadyShared);
-      return;
-    }
+  useEffect(() => {
+    localStorage.setItem('pos_daily_shares', JSON.stringify(shares));
+  }, [shares]);
+
+  const handleShare = async (type, xpAmount, shareTitle, shareText) => {
+    // Vérifier si déjà fait aujourd'hui
+    if (shares[type] === todayDate) return;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'Grindup.pro',
-          text: isFr ? 'Découvre Grindup.pro et Grindwear !' : 'Check out Grindup.pro and Grindwear!',
-          url: window.location.href,
+          title: shareTitle,
+          text: shareText,
+          url: window.location.href, // Envoie le lien de ton app
         });
-        // Si le partage réussit :
-        setXp(prev => prev + 50);
-        setLastShared(today);
-        localStorage.setItem('pos_last_shared', today);
+        
+        // Si le partage natif réussit
+        completeShare(type, xpAmount);
       } else {
-        // Fallback si le tel ne supporte pas le partage natif
-        navigator.clipboard.writeText(window.location.href);
-        alert(isFr ? "Lien copié dans le presse-papier !" : "Link copied to clipboard!");
-        setXp(prev => prev + 50);
-        setLastShared(today);
-        localStorage.setItem('pos_last_shared', today);
+        // Fallback si on est sur un vieil ordi qui n'a pas la fonction "Partager"
+        navigator.clipboard.writeText(`${shareText} - ${window.location.href}`);
+        alert(isFr ? "Lien copié ! Colle-le dans ta story ou à un ami." : "Link copied! Paste it in your story or to a friend.");
+        completeShare(type, xpAmount);
       }
     } catch (err) {
-      console.log("Partage annulé");
+      console.log("Partage annulé par l'utilisateur", err);
+      // On ne donne pas les points s'il annule le menu de partage
     }
   };
 
-  const handleOrder = () => {
-    const orderNum = prompt(isFr ? 'Numéro de commande Shopify (ex: #1024) :' : 'Shopify Order Number (e.g. #1024):');
-    if (!orderNum) return;
-    
-    if (claimedOrders.includes(orderNum)) {
-      alert(isFr ? 'Cette commande a déjà été utilisée.' : 'This order has already been used.');
-      return;
-    }
-
-    setClaimedOrders([...claimedOrders, orderNum]);
-    setXp(prev => prev + 1000);
-    alert(vocab.successOrder);
-  };
-
-  const handleIg = () => {
-    if (pendingIg) {
-      alert(isFr ? `Ton compte ${pendingIg} est en cours de vérification par notre équipe.` : `Your handle ${pendingIg} is pending review by our team.`);
-      return;
-    }
-
-    const handle = prompt(isFr ? 'Quel est ton @Instagram ?' : 'What is your @Instagram handle?');
-    if (!handle) return;
-
-    setPendingIg(handle);
-    localStorage.setItem('pos_pending_ig', handle);
-    alert(vocab.successIg);
+  const completeShare = (type, xpAmount) => {
+    setXp(prev => prev + xpAmount);
+    setShares(prev => ({ ...prev, [type]: todayDate }));
   };
 
   const handleClaim = (amount) => {
-    // Ici, plus tard, ça pourrait envoyer un email automatique ou afficher un code promo
-    alert(isFr 
-      ? `Félicitations ! Fais un screenshot de cet écran et envoie-le nous sur Instagram pour recevoir ton code promo de ${amount}$.` 
-      : `Congrats! Take a screenshot of this and send it to our Instagram to get your $${amount} promo code.`
-    );
+    alert(vocab.successClaim);
+    // Optionnel : Tu pourrais déduire les XP ici si tu veux qu'ils "dépensent" leurs points :
+    // setXp(prev => prev - (amount * 100)); 
   };
 
-  // Paliers
   const tiers = [
     { name: vocab.tier25, cost: 2500, value: 25 },
     { name: vocab.tier50, cost: 5000, value: 50 },
@@ -119,7 +93,7 @@ const Reward = ({ t, xp, setXp }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-10">
       
-      {/* HEADER */}
+      {/* HEADER GRINDWEAR */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl relative overflow-hidden text-center">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[#ccff00]/10 rounded-full blur-3xl pointer-events-none" />
         <ShoppingBag size={40} className="text-[#ccff00] mx-auto mb-3 relative z-10" />
@@ -139,7 +113,7 @@ const Reward = ({ t, xp, setXp }) => {
           const isUnlocked = xp >= tier.cost;
 
           return (
-            <div key={tier.cost} className={`p-4 rounded-2xl border transition-all ${isUnlocked ? 'bg-slate-800 border-[#ccff00]' : 'bg-slate-800/40 border-slate-700/50'}`}>
+            <div key={tier.cost} className={`p-4 rounded-2xl border transition-all ${isUnlocked ? 'bg-slate-800 border-[#ccff00] shadow-[0_0_15px_rgba(204,255,0,0.1)]' : 'bg-slate-800/40 border-slate-700/50'}`}>
               <Gift size={24} className={`mb-2 ${isUnlocked ? 'text-[#ccff00]' : 'text-slate-600'}`} />
               <h4 className="text-white font-black text-sm mb-1">{tier.name}</h4>
               <p className="text-xs font-bold text-slate-400 mb-3">{tier.cost} XP</p>
@@ -163,52 +137,78 @@ const Reward = ({ t, xp, setXp }) => {
         })}
       </div>
 
-      {/* MISSIONS POUR GAGNER DES POINTS */}
+      {/* MISSIONS DE PARTAGE */}
       <div>
         <h3 className="text-sm font-black text-white mb-3 pl-2 uppercase tracking-wider">{vocab.waysToEarn}</h3>
         
         <div className="space-y-2">
-          {/* Action : SHARE */}
-          <button onClick={handleShare} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group">
+          
+          {/* WORKOUT */}
+          <button 
+            disabled={shares.workout === todayDate}
+            onClick={() => handleShare('workout', 50, 'Grindup Training', isFr ? "Je viens de détruire mon workout grâce à Grindup.pro 🔥" : "Just crushed my workout with Grindup.pro 🔥")} 
+            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             <div className="flex items-center gap-3">
-              <div className="bg-blue-500/20 p-2 rounded-xl text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors"><Share2 size={20} /></div>
+              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400"><Dumbbell size={20} /></div>
               <div>
-                <p className="text-sm font-bold text-white">{vocab.actionShareTitle}</p>
-                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.actionShareDesc}</p>
+                <p className="text-sm font-bold text-white">{vocab.shareWorkout}</p>
+                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.shareWorkoutDesc}</p>
               </div>
             </div>
-            <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg">{vocab.actionShareBtn}</span>
-          </button>
-
-          {/* Action : ORDER NUMBER */}
-          <button onClick={handleOrder} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group">
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors"><Tag size={20} /></div>
-              <div>
-                <p className="text-sm font-bold text-white">{vocab.actionOrderTitle}</p>
-                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.actionOrderDesc}</p>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg">{vocab.actionOrderBtn}</span>
-          </button>
-
-          {/* Action : INSTAGRAM */}
-          <button onClick={handleIg} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group">
-            <div className="flex items-center gap-3">
-              <div className="bg-pink-500/20 p-2 rounded-xl text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-colors"><Camera size={20} /></div>
-              <div>
-                <p className="text-sm font-bold text-white">{vocab.actionIgTitle}</p>
-                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.actionIgDesc}</p>
-              </div>
-            </div>
-            {pendingIg ? (
-              <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-2 py-1.5 rounded-lg flex items-center gap-1">
-                <AlertCircle size={12}/> Pending
-              </span>
+            {shares.workout === todayDate ? (
+               <CheckCircle2 size={20} className="text-[#ccff00]" />
             ) : (
-              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg">{vocab.actionIgBtn}</span>
+              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <Share2 size={12}/> {vocab.btnShare}
+              </span>
             )}
           </button>
+
+          {/* HABITUDES / BIOHACKING */}
+          <button 
+            disabled={shares.habits === todayDate}
+            onClick={() => handleShare('habits', 50, 'Grindup Biohacking', isFr ? "La discipline bat la motivation. Je track mes habitudes sur Grindup.pro 🧬" : "Discipline over motivation. Tracking my habits on Grindup.pro 🧬")} 
+            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/20 p-2 rounded-xl text-blue-400"><Activity size={20} /></div>
+              <div>
+                <p className="text-sm font-bold text-white">{vocab.shareHabits}</p>
+                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.shareHabitsDesc}</p>
+              </div>
+            </div>
+            {shares.habits === todayDate ? (
+               <CheckCircle2 size={20} className="text-[#ccff00]" />
+            ) : (
+              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <Share2 size={12}/> {vocab.btnShare}
+              </span>
+            )}
+          </button>
+
+          {/* BUDGET */}
+          <button 
+            disabled={shares.budget === todayDate}
+            onClick={() => handleShare('budget', 50, 'Grindup Finances', isFr ? "Mon budget est calculé au millimètre sur Grindup.pro 💸" : "My budget is dialed in on Grindup.pro 💸")} 
+            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-pink-500/20 p-2 rounded-xl text-pink-400"><Wallet size={20} /></div>
+              <div>
+                <p className="text-sm font-bold text-white">{vocab.shareBudget}</p>
+                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.shareBudgetDesc}</p>
+              </div>
+            </div>
+            {shares.budget === todayDate ? (
+               <CheckCircle2 size={20} className="text-[#ccff00]" />
+            ) : (
+              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <Share2 size={12}/> {vocab.btnShare}
+              </span>
+            )}
+          </button>
+
         </div>
       </div>
 
