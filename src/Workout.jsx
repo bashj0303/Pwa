@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Check, Target, Plus, Trash2, Dumbbell, Layers, Ruler } from 'lucide-react';
+import { Save, Check, Target, Plus, Trash2, Dumbbell, Layers, Ruler, Zap, ShieldAlert } from 'lucide-react';
 
 const Workout = ({ t }) => {
   const isFr = t.month === 'mois';
@@ -18,48 +18,109 @@ const Workout = ({ t }) => {
 
     lbs: 'Lbs',
     reps: 'Reps',
-    addExercise: isFr ? 'Ajouter un exercice' : 'Add Exercise',
+    addExercise: isFr ? 'Ajouter' : 'Add',
     promptName: isFr ? 'Nom de l\'exercice ?' : 'Exercise name?',
     promptSets: isFr ? 'Nombre de séries ? (ex: 4)' : 'Number of sets? (e.g. 4)',
     promptReps: isFr ? 'Répétitions visées ? (ex: 8-12)' : 'Target reps? (e.g. 8-12)',
     emptyDay: isFr ? 'Jour de repos. Profites-en pour récupérer !' : 'Rest day. Take time to recover!',
     
+    templatesTitle: isFr ? 'Programmes Pré-Bâtis' : 'Pre-built Programs',
+    warnTemplate: isFr ? 'Attention : Charger ce programme va effacer ton programme actuel. Continuer ?' : 'Warning: Loading this program will erase your current one. Continue?',
+    
+    disclaimer: isFr 
+      ? 'Avertissement : Consultez un médecin avant de commencer ce programme d\'entraînement. Vous exécutez ces exercices à vos propres risques.'
+      : 'Disclaimer: Consult a physician before starting this training program. You perform these exercises at your own risk.',
+
     days: isFr 
       ? [{ id: 0, l: 'Lun' }, { id: 1, l: 'Mar' }, { id: 2, l: 'Mer' }, { id: 3, l: 'Jeu' }, { id: 4, l: 'Ven' }, { id: 5, l: 'Sam' }, { id: 6, l: 'Dim' }]
       : [{ id: 0, l: 'Mon' }, { id: 1, l: 'Tue' }, { id: 2, l: 'Wed' }, { id: 3, l: 'Thu' }, { id: 4, l: 'Fri' }, { id: 5, l: 'Sat' }, { id: 6, l: 'Sun' }]
   };
 
-  // --- GÉNÉRATEUR DU PROGRAMME PAR DÉFAUT (Aesthetic Split) ---
-  const generateDefaultRoutine = () => {
-    return {
+  // --- LES 3 PROGRAMMES PRÉ-BÂTIS ---
+  const PREBUILT_TEMPLATES = {
+    aesthetic: {
       0: [ // Lundi : Chest
-        { id: 'ex1', name: "Incline DB Press", sets: 4, targetReps: "8-10" },
-        { id: 'ex2', name: "Machine Chest Press", sets: 3, targetReps: "10-12" },
-        { id: 'ex3', name: "Cable Flyes", sets: 4, targetReps: "12-15" }
+        { id: '1', name: "Incline DB Press", sets: 4, targetReps: "8-10" },
+        { id: '2', name: "Machine Chest Press", sets: 3, targetReps: "10-12" },
+        { id: '3', name: "Cable Flyes", sets: 4, targetReps: "12-15" }
       ],
       1: [ // Mardi : Back
-        { id: 'ex4', name: "Pull-Ups", sets: 4, targetReps: "Max" },
-        { id: 'ex5', name: "Lat Pulldowns", sets: 4, targetReps: "10-12" },
-        { id: 'ex6', name: "Seated Row", sets: 4, targetReps: "8-10" }
+        { id: '4', name: "Wide Pull-Ups", sets: 4, targetReps: "Max" },
+        { id: '5', name: "Lat Pulldowns", sets: 4, targetReps: "10-12" },
+        { id: '6', name: "Seated Row", sets: 4, targetReps: "8-10" }
       ],
       2: [ // Mercredi : Legs
-        { id: 'ex7', name: "Squat", sets: 4, targetReps: "6-8" },
-        { id: 'ex8', name: "Leg Press", sets: 4, targetReps: "10-12" },
-        { id: 'ex9', name: "Leg Extension", sets: 4, targetReps: "15" }
+        { id: '7', name: "Barbell Squat", sets: 4, targetReps: "6-8" },
+        { id: '8', name: "Leg Press", sets: 4, targetReps: "10-12" },
+        { id: '9', name: "Leg Extension", sets: 4, targetReps: "15" }
       ],
       3: [ // Jeudi : Shoulders
-        { id: 'ex10', name: "Military Press", sets: 4, targetReps: "8-10" },
-        { id: 'ex11', name: "Lateral Raises", sets: 5, targetReps: "12-15" },
-        { id: 'ex12', name: "Reverse Pec Deck", sets: 4, targetReps: "12-15" }
+        { id: '10', name: "Military Press", sets: 4, targetReps: "8-10" },
+        { id: '11', name: "Lateral Raises", sets: 5, targetReps: "12-15" },
+        { id: '12', name: "Reverse Pec Deck", sets: 4, targetReps: "12-15" }
       ],
       4: [ // Vendredi : Arms
-        { id: 'ex13', name: "Barbell Curls", sets: 4, targetReps: "8-10" },
-        { id: 'ex14', name: "Skull Crushers", sets: 4, targetReps: "8-10" },
-        { id: 'ex15', name: "Hammer Curls", sets: 3, targetReps: "12" }
+        { id: '13', name: "Barbell Curls", sets: 4, targetReps: "8-10" },
+        { id: '14', name: "Skull Crushers", sets: 4, targetReps: "8-10" },
+        { id: '15', name: "Hammer Curls", sets: 3, targetReps: "12" }
       ],
-      5: [], // Samedi : Repos
-      6: []  // Dimanche : Repos
-    };
+      5: [], 6: []
+    },
+    athletic: {
+      0: [ // Lundi : Heavy Lower
+        { id: '1', name: "Back Squat", sets: 5, targetReps: "5" },
+        { id: '2', name: "Bulgarian Split Squats", sets: 3, targetReps: "10/leg" },
+        { id: '3', name: "Hanging Leg Raises", sets: 4, targetReps: "15" }
+      ],
+      1: [ // Mardi : Upper Strength
+        { id: '4', name: "Strict Overhead Press", sets: 4, targetReps: "6-8" },
+        { id: '5', name: "Weighted Pull-Ups", sets: 4, targetReps: "6-8" },
+        { id: '6', name: "DB Bench Press", sets: 3, targetReps: "10" }
+      ],
+      2: [ // Mercredi : Conditioning
+        { id: '7', name: "Row Ergometer (500m sprints)", sets: 5, targetReps: "1:45 pace" },
+        { id: '8', name: "Kettlebell Swings", sets: 4, targetReps: "20" }
+      ],
+      3: [ // Jeudi : Heavy Posterior
+        { id: '9', name: "Deadlift", sets: 4, targetReps: "5" },
+        { id: '10', name: "Hamstring Curls", sets: 4, targetReps: "12" },
+        { id: '11', name: "Farmer's Carry", sets: 3, targetReps: "40m" }
+      ],
+      4: [ // Vendredi : Upper Hypertrophy
+        { id: '12', name: "Incline Bench Press", sets: 4, targetReps: "10" },
+        { id: '13', name: "Barbell Rows", sets: 4, targetReps: "10" },
+        { id: '14', name: "Dips", sets: 3, targetReps: "Max" }
+      ],
+      5: [], 6: []
+    },
+    bikini: {
+      0: [ // Lundi : Glutes & Hammies
+        { id: '1', name: "Barbell Hip Thrusts", sets: 4, targetReps: "10-12" },
+        { id: '2', name: "Romanian Deadlifts (RDL)", sets: 4, targetReps: "10" },
+        { id: '3', name: "Cable Kickbacks", sets: 3, targetReps: "15/leg" }
+      ],
+      1: [ // Mardi : Upper Body
+        { id: '4', name: "DB Shoulder Press", sets: 3, targetReps: "12" },
+        { id: '5', name: "Lat Pulldowns", sets: 3, targetReps: "12" },
+        { id: '6', name: "Lateral Raises", sets: 4, targetReps: "15" }
+      ],
+      2: [], // Mercredi : Repos
+      3: [ // Jeudi : Glutes Isolation
+        { id: '7', name: "Kas Glute Bridges", sets: 4, targetReps: "12" },
+        { id: '8', name: "Bulgarian Split Squats", sets: 3, targetReps: "10/leg" },
+        { id: '9', name: "Hip Abductor Machine", sets: 4, targetReps: "15-20" }
+      ],
+      4: [ // Vendredi : Quads & Calves
+        { id: '10', name: "Goblet Squats", sets: 4, targetReps: "10" },
+        { id: '11', name: "Leg Press (Feet low)", sets: 4, targetReps: "12" },
+        { id: '12', name: "Calf Raises", sets: 4, targetReps: "20" }
+      ],
+      5: [ // Samedi : Core & Cardio
+        { id: '13', name: "Plank", sets: 3, targetReps: "60s" },
+        { id: '14', name: "Stairmaster", sets: 1, targetReps: "20 mins" }
+      ],
+      6: []
+    }
   };
 
   const getTodayIndex = () => {
@@ -70,33 +131,30 @@ const Workout = ({ t }) => {
   // --- ÉTATS ---
   const [activeDay, setActiveDay] = useState(getTodayIndex());
   const [showSaved, setShowSaved] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false); // Menu déroulant des templates
 
-  // Le programme complet de la semaine
   const [routine, setRoutine] = useState(() => {
-    const saved = localStorage.getItem('pos_routine_v2');
-    return saved ? JSON.parse(saved) : generateDefaultRoutine();
+    const saved = localStorage.getItem('pos_routine_v3');
+    return saved ? JSON.parse(saved) : PREBUILT_TEMPLATES.aesthetic;
   });
 
-  // Les performances (Poids / Reps)
   const [logs, setLogs] = useState(() => {
-    const saved = localStorage.getItem('pos_workout_logs_v2');
+    const saved = localStorage.getItem('pos_workout_logs_v3');
     return saved ? JSON.parse(saved) : {};
   });
 
-  // Mensurations
   const [stats, setStats] = useState(() => {
-    const saved = localStorage.getItem('pos_body_stats_v2');
+    const saved = localStorage.getItem('pos_body_stats_v3');
     return saved ? JSON.parse(saved) : { weight: '', waist: '', energy: '' };
   });
 
   // --- SAUVEGARDES AUTO ---
-  useEffect(() => localStorage.setItem('pos_routine_v2', JSON.stringify(routine)), [routine]);
-  useEffect(() => localStorage.setItem('pos_workout_logs_v2', JSON.stringify(logs)), [logs]);
-  useEffect(() => localStorage.setItem('pos_body_stats_v2', JSON.stringify(stats)), [stats]);
+  useEffect(() => localStorage.setItem('pos_routine_v3', JSON.stringify(routine)), [routine]);
+  useEffect(() => localStorage.setItem('pos_workout_logs_v3', JSON.stringify(logs)), [logs]);
+  useEffect(() => localStorage.setItem('pos_body_stats_v3', JSON.stringify(stats)), [stats]);
 
   // --- FONCTIONS ---
   const handleSave = () => {
-    // Exporter le workout du jour pour le bouton "Share" des Rewards
     const currentDayExercises = routine[activeDay] || [];
     const exportData = currentDayExercises.map(ex => {
       const exLog = logs[ex.id] || { lbs: 0, reps: 0 };
@@ -108,7 +166,6 @@ const Workout = ({ t }) => {
       };
     });
     
-    // Si l'utilisateur s'entraîne, on ne sauvegarde que s'il y a des données
     if (exportData.length > 0) {
       localStorage.setItem('pos_workouts', JSON.stringify(exportData));
     }
@@ -124,11 +181,9 @@ const Workout = ({ t }) => {
     }));
   };
 
-  // Ajouter un exercice au jour actif
   const handleAddExercise = () => {
     const name = prompt(vocab.promptName);
     if (!name) return;
-    
     const sets = prompt(vocab.promptSets, "4");
     const reps = prompt(vocab.promptReps, "8-12");
 
@@ -145,17 +200,21 @@ const Workout = ({ t }) => {
     }));
   };
 
-  // Supprimer un exercice
   const handleDeleteExercise = (exId) => {
     if(window.confirm(isFr ? "Supprimer cet exercice ?" : "Delete this exercise?")) {
       setRoutine(prev => ({
         ...prev,
         [activeDay]: prev[activeDay].filter(ex => ex.id !== exId)
       }));
-      // On nettoie aussi le log de cet exercice
-      const newLogs = { ...logs };
-      delete newLogs[exId];
-      setLogs(newLogs);
+    }
+  };
+
+  const loadTemplate = (templateKey) => {
+    if(window.confirm(vocab.warnTemplate)) {
+      setRoutine(PREBUILT_TEMPLATES[templateKey]);
+      setLogs({}); // Efface les anciennes perfs pour ne pas les mélanger
+      setShowTemplates(false);
+      setActiveDay(0); // Ramène au Lundi
     }
   };
 
@@ -182,21 +241,38 @@ const Workout = ({ t }) => {
         </button>
       </div>
 
-      {/* SÉLECTEUR DE JOURS (Semaine) */}
-      <div className="flex bg-black/40 p-1 rounded-xl border border-slate-700/50">
-        {vocab.days.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => setActiveDay(d.id)}
-            className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-colors uppercase tracking-wider ${activeDay === d.id ? 'bg-[#ccff00] text-black shadow-sm' : 'text-slate-500 hover:text-white'}`}
-          >
-            {d.l}
-          </button>
-        ))}
+      {/* BOUTON TEMPLATES */}
+      <div className="relative">
+        <button 
+          onClick={() => setShowTemplates(!showTemplates)}
+          className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl flex items-center justify-between hover:bg-slate-700 transition"
+        >
+          <span className="text-xs font-bold text-white flex items-center gap-2">
+            <Zap size={16} className="text-[#ccff00]" /> {vocab.templatesTitle}
+          </span>
+          <span className="text-[10px] bg-black/50 px-2 py-1 rounded text-slate-400">LOAD</span>
+        </button>
+
+        {showTemplates && (
+          <div className="absolute top-14 left-0 w-full bg-slate-800 border border-[#ccff00]/30 p-2 rounded-xl z-20 shadow-2xl flex flex-col gap-2 animate-in slide-in-from-top-2">
+            <button onClick={() => loadTemplate('aesthetic')} className="bg-slate-900 p-3 rounded-lg text-left hover:bg-slate-700 transition">
+              <span className="block text-sm font-black text-[#ccff00]">1. Aesthetic Blueprint</span>
+              <span className="block text-[10px] text-slate-400">Jeff Seid Style (Brosplit)</span>
+            </button>
+            <button onClick={() => loadTemplate('athletic')} className="bg-slate-900 p-3 rounded-lg text-left hover:bg-slate-700 transition">
+              <span className="block text-sm font-black text-blue-400">2. Overall Athletic</span>
+              <span className="block text-[10px] text-slate-400">Amoti Style (Strength & Conditioning)</span>
+            </button>
+            <button onClick={() => loadTemplate('bikini')} className="bg-slate-900 p-3 rounded-lg text-left hover:bg-slate-700 transition">
+              <span className="block text-sm font-black text-pink-400">3. Bikini Pro</span>
+              <span className="block text-[10px] text-slate-400">Briana Style (Glutes & Legs Focus)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TRACKER MENSURATIONS COMPACT */}
-      <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-3 shadow-sm">
+      <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-3 shadow-sm relative z-10">
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center">
             <label className="text-[8px] text-slate-400 font-bold mb-0.5 uppercase tracking-widest">{vocab.weight}</label>
@@ -213,8 +289,21 @@ const Workout = ({ t }) => {
         </div>
       </div>
 
-      {/* LISTE DES EXERCICES (ULTRA SLIM) */}
-      <div className="space-y-2 pb-6">
+      {/* SÉLECTEUR DE JOURS (Semaine) */}
+      <div className="flex bg-black/40 p-1 rounded-xl border border-slate-700/50">
+        {vocab.days.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => setActiveDay(d.id)}
+            className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-colors uppercase tracking-wider ${activeDay === d.id ? 'bg-[#ccff00] text-black shadow-sm' : 'text-slate-500 hover:text-white'}`}
+          >
+            {d.l}
+          </button>
+        ))}
+      </div>
+
+      {/* LISTE DES EXERCICES */}
+      <div className="space-y-2 pb-2">
         <div className="flex justify-between items-center mb-2 px-1">
           <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
             <Dumbbell size={14} className="text-[#ccff00]" /> Workout
@@ -242,35 +331,35 @@ const Workout = ({ t }) => {
                   </p>
                 </div>
 
-                {/* Inputs & Actions */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                {/* Inputs & Actions (Correction Anti-Glitch : Flex Column au lieu de Position Absolute) */}
+                <div className="flex items-center gap-2 shrink-0">
                   
                   {/* Case Poids */}
-                  <div className="bg-slate-900 rounded-lg p-1 w-[4.5rem] border border-slate-700/50 relative">
-                    <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-slate-900 px-1 text-[7px] font-bold text-slate-500 uppercase">{vocab.lbs}</span>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">{vocab.lbs}</span>
                     <input 
                       type="number" 
                       value={log.lbs}
                       onChange={(e) => updateLog(ex.id, 'lbs', e.target.value)}
-                      className="w-full bg-transparent text-center font-black text-[#ccff00] text-[16px] focus:outline-none placeholder-slate-700 pt-1" 
+                      className="w-14 h-8 bg-slate-900 border border-slate-700/50 rounded-lg text-center font-black text-[#ccff00] text-[16px] focus:outline-none focus:border-[#ccff00] placeholder-slate-700" 
                       placeholder="-"
                     />
                   </div>
 
                   {/* Case Reps */}
-                  <div className="bg-slate-900 rounded-lg p-1 w-12 border border-slate-700/50 relative">
-                    <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-slate-900 px-1 text-[7px] font-bold text-slate-500 uppercase">{vocab.reps}</span>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">{vocab.reps}</span>
                     <input 
                       type="number" 
                       value={log.reps}
                       onChange={(e) => updateLog(ex.id, 'reps', e.target.value)}
-                      className="w-full bg-transparent text-center font-black text-white text-[16px] focus:outline-none placeholder-slate-700 pt-1" 
+                      className="w-12 h-8 bg-slate-900 border border-slate-700/50 rounded-lg text-center font-black text-white text-[16px] focus:outline-none focus:border-white placeholder-slate-700" 
                       placeholder="-"
                     />
                   </div>
 
                   {/* Bouton Supprimer */}
-                  <button onClick={() => handleDeleteExercise(ex.id)} className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors ml-1">
+                  <button onClick={() => handleDeleteExercise(ex.id)} className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors ml-1 mt-3">
                     <Trash2 size={16} />
                   </button>
 
@@ -279,6 +368,14 @@ const Workout = ({ t }) => {
             );
           })
         )}
+      </div>
+
+      {/* DISCLAIMER LÉGAL */}
+      <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-start gap-2 opacity-60">
+        <ShieldAlert size={14} className="text-slate-500 shrink-0 mt-0.5" />
+        <p className="text-[9px] text-slate-500 leading-tight">
+          {vocab.disclaimer}
+        </p>
       </div>
 
     </div>
