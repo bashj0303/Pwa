@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Flame, RotateCcw, Settings } from 'lucide-react';
 
-// --- BASE DE DONNÉES INTERNE (Aide au remplissage) ---
+// --- BASE DE DONNÉES INTERNE ---
 const DB = {
   'poulet': { k: 165, p: 31, c: 0, f: 3.6, u: '100g' },
   'dinde': { k: 135, p: 30, c: 0, f: 1, u: '100g' },
   'boeuf': { k: 250, p: 26, c: 0, f: 15, u: '100g' },
   'riz': { k: 130, p: 2.7, c: 28, f: 0.3, u: '100g cuit' },
   'pates': { k: 131, p: 5, c: 25, f: 1, u: '100g cuit' },
+  'pâte': { k: 131, p: 5, c: 25, f: 1, u: '100g' },
   'patate douce': { k: 86, p: 1.6, c: 20, f: 0.1, u: '100g' },
   'avoine': { k: 380, p: 13, c: 60, f: 7, u: '100g' },
   'whey': { k: 120, p: 24, c: 2, f: 1, u: '1 scoop' },
@@ -23,18 +24,28 @@ const Nutrition = ({ t }) => {
   const isFr = t.month === 'mois';
 
   const vocab = {
-    title: isFr ? 'Nutrition' : 'Nutrition',
-    clearAll: isFr ? 'Tout effacer ?' : 'Clear all?',
+    title: isFr ? 'Diète' : 'Diet',
+    clearAll: isFr ? 'Effacer la journée ?' : 'Clear today?',
     setGoalsTitle: isFr ? 'Ajuster mes objectifs' : 'Adjust goals',
-    namePlaceholder: isFr ? 'Nom (ex: Riz 200)' : 'Name (ex: Rice 200)',
-    btnAdd: isFr ? 'Ajouter' : 'Add',
-    emptyState: isFr ? 'Aucun repas. Ajoute ton premier plat.' : 'No meals yet. Add your first dish.',
+    namePlaceholder: isFr ? 'Aliment (ex: Riz)' : 'Food (ex: Rice)',
+    emptyState: isFr ? 'Aucun repas ce jour-là. Ajoute ton premier plat.' : 'No meals for this day. Add a dish.',
+    days: isFr 
+      ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  };
+
+  const getTodayIndex = () => {
+    let day = new Date().getDay();
+    return day === 0 ? 6 : day - 1; 
   };
 
   // --- ÉTATS ---
-  const [foods, setFoods] = useState(() => {
-    const saved = localStorage.getItem('pos_nutri_foods');
-    return saved ? JSON.parse(saved) : [];
+  const [activeDay, setActiveDay] = useState(getTodayIndex());
+
+  const [weeklyFoods, setWeeklyFoods] = useState(() => {
+    const saved = localStorage.getItem('pos_nutri_weekly_v3');
+    if (saved) return JSON.parse(saved);
+    return { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
   });
 
   const [goals, setGoals] = useState(() => {
@@ -44,42 +55,42 @@ const Nutrition = ({ t }) => {
 
   const [showSettings, setShowSettings] = useState(false);
   
-  // Obtenir l'heure actuelle
   const now = new Date();
   const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
   const [timeStr, setTimeStr] = useState(defaultTime);
   const [totals, setTotals] = useState({ k: 0, p: 0, c: 0, f: 0 });
-  const [form, setForm] = useState({ name: '', k: '', p: '', c: '', f: '' });
+  
+  // Nouveau formulaire avec "qty" (quantité) séparé
+  const [form, setForm] = useState({ name: '', qty: '', k: '', p: '', c: '', f: '' });
 
-  // Sauvegardes
-  useEffect(() => localStorage.setItem('pos_nutri_foods', JSON.stringify(foods)), [foods]);
+  useEffect(() => localStorage.setItem('pos_nutri_weekly_v3', JSON.stringify(weeklyFoods)), [weeklyFoods]);
   useEffect(() => localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)), [goals]);
 
-  // Recalcul auto des totaux
+  const currentFoods = weeklyFoods[activeDay] || [];
+
   useEffect(() => {
-    const t = foods.reduce((acc, item) => ({
+    const t = currentFoods.reduce((acc, item) => ({
       k: acc.k + item.k,
       p: acc.p + item.p,
       c: acc.c + item.c,
       f: acc.f + item.f,
     }), { k: 0, p: 0, c: 0, f: 0 });
     setTotals(t);
-  }, [foods]);
+  }, [currentFoods, activeDay]);
 
-  // Gestion intelligente de la saisie
-  const handleNameChange = (val) => {
-    setForm(prev => ({ ...prev, name: val }));
-    const lowerText = val.toLowerCase();
+  // FONCTION INTELLIGENTE : Combine le Nom et la Quantité
+  const handleAutoCalc = (newName, newQty) => {
+    setForm(prev => ({ ...prev, name: newName, qty: newQty }));
     
+    const lowerText = newName.toLowerCase();
     const matchKey = Object.keys(DB).find(key => lowerText.includes(key));
+    const parsedQty = parseFloat(newQty);
 
-    if (matchKey) {
+    // Si on a reconnu l'aliment ET qu'il y a un chiffre valide
+    if (matchKey && parsedQty > 0) {
       const data = DB[matchKey];
-      const qtyMatch = val.match(/(\d+)/);
-      const qty = qtyMatch ? parseFloat(qtyMatch[0]) : (data.u.includes('100g') ? 100 : 1);
-      
-      const ratio = data.u.includes('100g') ? qty / 100 : qty;
+      const ratio = data.u.includes('100g') ? parsedQty / 100 : parsedQty;
 
       setForm(prev => ({
         ...prev,
@@ -93,27 +104,52 @@ const Nutrition = ({ t }) => {
 
   const addEntry = () => {
     if (!form.name) return;
-    setFoods([...foods, {
+
+    // Créer un beau nom avec la quantité incluse (ex: "Poulet (200g)")
+    let finalName = form.name.charAt(0).toUpperCase() + form.name.slice(1);
+    if (form.qty && Number(form.qty) > 0) {
+      const lowerText = form.name.toLowerCase();
+      const matchKey = Object.keys(DB).find(key => lowerText.includes(key));
+      // Déterminer si c'est des grammes (g) ou des unités (u)
+      const unit = matchKey && !DB[matchKey].u.includes('100g') ? 'u' : 'g';
+      finalName += ` (${form.qty}${unit})`;
+    }
+    
+    const newFood = {
       id: Date.now(),
       time: timeStr,
-      name: form.name.charAt(0).toUpperCase() + form.name.slice(1),
+      name: finalName,
       k: Number(form.k) || 0,
       p: Number(form.p) || 0,
       c: Number(form.c) || 0,
       f: Number(form.f) || 0
-    }].sort((a, b) => a.time.localeCompare(b.time)));
+    };
 
-    setForm({ name: '', k: '', p: '', c: '', f: '' });
+    setWeeklyFoods(prev => {
+      const dayFoods = [...prev[activeDay], newFood].sort((a, b) => a.time.localeCompare(b.time));
+      return { ...prev, [activeDay]: dayFoods };
+    });
+
+    setForm({ name: '', qty: '', k: '', p: '', c: '', f: '' });
   };
 
-  const clearAll = () => {
-    if(window.confirm(vocab.clearAll)) setFoods([]);
+  const deleteEntry = (id) => {
+    setWeeklyFoods(prev => ({
+      ...prev,
+      [activeDay]: prev[activeDay].filter(f => f.id !== id)
+    }));
   };
 
-  const getPercent = (current, max) => Math.min(100, Math.round((current / max) * 100));
+  const clearDay = () => {
+    if(window.confirm(vocab.clearAll)) {
+      setWeeklyFoods(prev => ({ ...prev, [activeDay]: [] }));
+    }
+  };
+
+  const getPercent = (current, max) => Math.min(100, Math.round((current / (max || 1)) * 100));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-56">
+    <div className="space-y-4 animate-in fade-in duration-300 pb-56">
       
       {/* HEADER & JAUGES DE MACROS */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-[2rem] shadow-xl relative">
@@ -125,10 +161,23 @@ const Nutrition = ({ t }) => {
             <button onClick={() => setShowSettings(!showSettings)} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
               <Settings size={16} />
             </button>
-            <button onClick={clearAll} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
+            <button onClick={clearDay} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
               <RotateCcw size={16} />
             </button>
           </div>
+        </div>
+
+        {/* SÉLECTEUR DE JOURS */}
+        <div className="flex justify-between items-center bg-black/40 p-1 rounded-xl border border-slate-700/50 mb-5">
+          {vocab.days.map((d, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveDay(i)}
+              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-colors ${activeDay === i ? 'bg-[#ccff00] text-black shadow-sm' : 'text-slate-500 hover:text-white'}`}
+            >
+              {d}
+            </button>
+          ))}
         </div>
 
         {/* SECTION REGLAGES OBJECTIFS */}
@@ -187,15 +236,15 @@ const Nutrition = ({ t }) => {
         </div>
       </div>
 
-      {/* LISTE DES REPAS */}
+      {/* LISTE DES REPAS DU JOUR ACTIF */}
       <div className="space-y-3">
-        {foods.length === 0 && (
-          <div className="text-center py-10 text-slate-500 text-xs italic">
+        {currentFoods.length === 0 && (
+          <div className="text-center py-10 text-slate-500 text-xs italic bg-slate-800/20 rounded-2xl border border-dashed border-slate-700/50">
             {vocab.emptyState}
           </div>
         )}
 
-        {foods.map((item) => (
+        {currentFoods.map((item) => (
           <div key={item.id} className="bg-slate-800/60 border border-slate-700/50 p-3 rounded-2xl flex items-center shadow-md">
             
             <div className="pr-3 border-r border-slate-700/50 mr-3 text-center">
@@ -215,17 +264,18 @@ const Nutrition = ({ t }) => {
               </div>
             </div>
 
-            <button onClick={() => setFoods(foods.filter(f => f.id !== item.id))} className="ml-3 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition">
+            <button onClick={() => deleteEntry(item.id)} className="ml-3 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition">
               <Trash2 size={16} />
             </button>
           </div>
         ))}
       </div>
 
-      {/* PANNEAU DE SAISIE FLOTTANT CORRIGÉ (CENTRE & ANTI-ZOOM) */}
+      {/* PANNEAU DE SAISIE FLOTTANT */}
       <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-y border-slate-800/80 p-4 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <div className="w-full space-y-3">
             
+            {/* LIGNE 1 : Heure + Aliment + Quantité */}
             <div className="flex gap-2">
               <input 
                 type="time" 
@@ -236,12 +286,23 @@ const Nutrition = ({ t }) => {
               <input 
                 type="text" 
                 value={form.name}
-                onChange={e => handleNameChange(e.target.value)}
+                onChange={e => handleAutoCalc(e.target.value, form.qty)}
                 placeholder={vocab.namePlaceholder}
                 className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[16px] font-bold text-white outline-none focus:border-[#ccff00] placeholder-slate-600"
               />
+              <div className="relative w-24">
+                <input 
+                  type="number" 
+                  value={form.qty}
+                  onChange={e => handleAutoCalc(form.name, e.target.value)}
+                  placeholder="Qté"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-2 pr-6 py-2 text-[16px] font-bold text-[#ccff00] outline-none focus:border-[#ccff00] placeholder-slate-600"
+                />
+                <span className="absolute right-2 top-3 text-[10px] font-bold text-slate-500 pointer-events-none">g/u</span>
+              </div>
             </div>
 
+            {/* LIGNE 2 : Macros + Bouton Ajouter */}
             <div className="flex gap-2">
               {[
                 { l: 'Kcal', v: form.k, k: 'k', c: 'text-orange-500 border-orange-500/30' },
@@ -253,7 +314,7 @@ const Nutrition = ({ t }) => {
                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#0f172a] px-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider">{f.l}</span>
                    <input 
                     type="number" 
-                    placeholder="0"
+                    placeholder="-"
                     value={f.v === 0 ? '' : f.v} 
                     onChange={e => setForm({...form, [f.k]: e.target.value})} 
                     className={`w-full py-2 bg-slate-900 border rounded-xl text-center text-[16px] font-black outline-none ${f.c}`} 
