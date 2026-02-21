@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { Activity, Wallet, Dumbbell, FlaskConical, Gift, Crown, Download, Trash2, Globe, Share } from 'lucide-react';
+import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share } from 'lucide-react';
 
 import Dashboard from './Dashboard';
 import Budget from './Budget';
 import Workout from './Workout';
 import Lab from './Lab';
-import Reward from './Reward'; // NOUVEAU FICHIER IMPORTÉ
+import Reward from './Reward';
+import Nutrition from './Nutrition'; // NOUVEAU FICHIER
 
 const App = () => {
   const loadState = (key, defaultValue) => {
@@ -26,7 +28,8 @@ const App = () => {
       tabBudget: 'Budget',
       tabWorkout: 'Training',
       tabLab: 'Lab',
-      tabReward: 'Rewards', // TRADUCTION DE L'ONGLET
+      tabReward: 'Rewards',
+      tabNutrition: 'Diet', // TRADUCTION ONGLET NUTRITION
       goPremium: 'Go Premium',
       premiumDesc: 'Unlock cloud sync, advanced protocols and data export.',
       subscribe: 'Subscribe',
@@ -47,7 +50,8 @@ const App = () => {
       tabBudget: 'Budget',
       tabWorkout: 'Training',
       tabLab: 'Labo',
-      tabReward: 'Récompenses', // TRADUCTION DE L'ONGLET
+      tabReward: 'Rewards',
+      tabNutrition: 'Diète', // TRADUCTION ONGLET NUTRITION
       goPremium: 'Passez Premium',
       premiumDesc: 'Débloquez la synchro cloud, les protocoles avancés et l\'export.',
       subscribe: 'S\'abonner',
@@ -121,7 +125,6 @@ const App = () => {
   const [showPremium, setShowPremium] = useState(false);
   const [xp, setXp] = useState(() => loadState('pos_xp', 140));
 
-  // Récupération globale du budget pour le dashboard
   const [expenses] = useState(() => loadState('pos_budget_v5_m' + new Date().getMonth(), { fixed: [], variables: [], autoTransfers: [], incomeBase: 0, incomeTS: 0 }));
   const [payFreq] = useState(() => loadState('pos_pay_freq_v5', 2));
   
@@ -157,6 +160,7 @@ const App = () => {
             <p className="text-3xl font-black text-white capitalize tracking-tight">
               {activeTab === 'dashboard' && t.tabDashboard}
               {activeTab === 'budget' && t.tabBudget}
+              {activeTab === 'nutrition' && t.tabNutrition}
               {activeTab === 'workout' && t.tabWorkout}
               {activeTab === 'lab' && t.tabLab}
               {activeTab === 'reward' && t.tabReward}
@@ -207,19 +211,21 @@ const App = () => {
         <main className="flex-1 overflow-y-auto px-6 pt-6 pb-28 no-scrollbar">
           {activeTab === 'dashboard' && <Dashboard t={t} xp={xp} setXp={setXp} balance={balance} protocols={protocols} setProtocols={setProtocols} setActiveTab={setActiveTab} />}
           {activeTab === 'budget' && <Budget t={t} />}
+          {activeTab === 'nutrition' && <Nutrition t={t} />}
           {activeTab === 'workout' && <Workout t={t} workouts={workouts} setWorkouts={setWorkouts} />}
           {activeTab === 'lab' && <Lab t={t} />}
           {activeTab === 'reward' && <Reward t={t} xp={xp} setXp={setXp} />}
         </main>
 
-        <nav className="fixed bottom-0 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-t border-slate-800 px-2 py-4 z-40 pb-8">
-          <div className="flex justify-around items-center">
+        <nav className="fixed bottom-0 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-t border-slate-800 px-2 py-4 z-40 pb-6">
+          <div className="flex justify-between items-center">
             {[
               { id: 'dashboard', icon: Activity, label: t.tabDashboard },
               { id: 'budget', icon: Wallet, label: t.tabBudget },
+              { id: 'nutrition', icon: UtensilsCrossed, label: t.tabNutrition },
               { id: 'workout', icon: Dumbbell, label: t.tabWorkout },
               { id: 'lab', icon: FlaskConical, label: t.tabLab },
-              { id: 'reward', icon: Gift, label: t.tabReward } // NOUVEL ONGLET 5
+              { id: 'reward', icon: Gift, label: t.tabReward }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
@@ -227,10 +233,10 @@ const App = () => {
                 <button 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center gap-1.5 w-14 transition-all duration-300 ${isActive ? 'text-[#ccff00] -translate-y-1' : 'text-slate-500 hover:text-slate-400'}`}
+                  className={`flex flex-col items-center gap-1.5 w-12 transition-all duration-300 ${isActive ? 'text-[#ccff00] -translate-y-1' : 'text-slate-500 hover:text-slate-400'}`}
                 >
-                  <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className={`text-[8px] font-bold uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-70'}`}>
+                  <Icon size={isActive ? 20 : 18} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className={`text-[7px] font-bold uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-70'}`}>
                     {tab.label}
                   </span>
                   {isActive && <div className="w-1 h-1 bg-[#ccff00] rounded-full mt-0.5 shadow-[0_0_8px_#ccff00]" />}
