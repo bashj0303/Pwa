@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, ShoppingBag, Share2, Dumbbell, Activity, Wallet, CheckCircle2 } from 'lucide-react';
+import { Gift, ShoppingBag, Share2, Dumbbell, Activity, UtensilsCrossed, CheckCircle2 } from 'lucide-react';
 
 const Reward = ({ t, xp, setXp }) => {
   const isFr = t.month === 'mois';
@@ -17,18 +17,16 @@ const Reward = ({ t, xp, setXp }) => {
     
     waysToEarn: isFr ? 'Missions Quotidiennes (Social)' : 'Daily Missions (Social)',
     
-    // Nouveaux montants ajustés
     shareWorkout: isFr ? 'Partager mon Workout' : 'Share my Workout',
-    shareWorkoutDesc: isFr ? 'Montre ta session du jour (+10 XP)' : 'Flex today\'s session (+10 XP)',
+    shareWorkoutDesc: isFr ? 'Partage tes perfs du jour (+10 XP)' : 'Flex today\'s stats (+10 XP)',
     
     shareHabits: isFr ? 'Partager mes Habitudes' : 'Share my Habits',
     shareHabitsDesc: isFr ? 'Montre ta constance (+10 XP)' : 'Flex your consistency (+10 XP)',
     
-    shareBudget: isFr ? 'Partager mon Budget' : 'Share my Budget',
-    shareBudgetDesc: isFr ? 'Montre ta discipline financière (+10 XP)' : 'Flex your financial discipline (+10 XP)',
+    shareDiet: isFr ? 'Partager ma Diète' : 'Share my Diet',
+    shareDietDesc: isFr ? 'Partage tes macros du jour (+10 XP)' : 'Flex your daily macros (+10 XP)',
 
     btnShare: isFr ? 'Partager' : 'Share',
-    btnDone: isFr ? 'Fait aujourd\'hui' : 'Done today',
     
     successClaim: isFr 
       ? "Félicitations ! Prends une capture d'écran et envoie-nous un DM sur Instagram @Grindwear pour ton code !" 
@@ -39,32 +37,87 @@ const Reward = ({ t, xp, setXp }) => {
   const todayDate = new Date().toDateString();
 
   const [shares, setShares] = useState(() => {
-    const saved = localStorage.getItem('pos_daily_shares');
-    return saved ? JSON.parse(saved) : { workout: null, habits: null, budget: null };
+    const saved = localStorage.getItem('pos_daily_shares_v2');
+    return saved ? JSON.parse(saved) : { workout: null, habits: null, diet: null };
   });
 
   useEffect(() => {
-    localStorage.setItem('pos_daily_shares', JSON.stringify(shares));
+    localStorage.setItem('pos_daily_shares_v2', JSON.stringify(shares));
   }, [shares]);
 
-  const handleShare = async (type, xpAmount, shareTitle, shareText) => {
+  // --- GÉNÉRATEURS DE TEXTE DYNAMIQUE ---
+
+  const generateWorkoutText = () => {
+    const workouts = JSON.parse(localStorage.getItem('pos_workouts')) || [];
+    if (workouts.length === 0) return null;
+    
+    let text = isFr ? "💪 Ma session du jour :\n" : "💪 Today's grind:\n";
+    workouts.forEach(w => {
+      text += `- ${w.name} : ${w.weight}lbs (${w.reps})\n`;
+    });
+    text += "\nTracké avec Grindup.pro 🔥";
+    return text;
+  };
+
+  const generateDietText = () => {
+    const weeklyFoods = JSON.parse(localStorage.getItem('pos_nutri_weekly_v3')) || {};
+    let dayIdx = new Date().getDay();
+    dayIdx = dayIdx === 0 ? 6 : dayIdx - 1; // Ajustement Lundi=0
+    
+    const todayFoods = weeklyFoods[dayIdx] || [];
+    if (todayFoods.length === 0) return null;
+
+    const macros = todayFoods.reduce((acc, f) => ({
+      k: acc.k + f.k, p: acc.p + f.p, c: acc.c + f.c, fat: acc.f + f.f
+    }), { k: 0, p: 0, c: 0, fat: 0 });
+
+    let text = isFr ? "🔥 Mes Macros du jour :\n" : "🔥 Today's Macros:\n";
+    text += `Calories : ${macros.k} kcal\nProtéines : ${macros.p}g\nGlucides : ${macros.c}g\nLipides : ${macros.fat}g\n`;
+    text += "\nTracké avec Grindup.pro 🥩";
+    return text;
+  };
+
+  const generateHabitsText = () => {
+    const protocols = JSON.parse(localStorage.getItem('pos_protocols')) || [];
+    const done = protocols.filter(p => p.done);
+    if (done.length === 0) return null;
+
+    let text = isFr ? "🧬 Discipline & Biohacking :\n" : "🧬 Discipline & Biohacking:\n";
+    done.forEach(p => {
+      text += `✅ ${p.name}\n`;
+    });
+    text += "\nTracké avec Grindup.pro 🚀";
+    return text;
+  };
+
+  // --- FONCTION DE PARTAGE ---
+
+  const handleShare = async (type, xpAmount, generatorFunc) => {
     if (shares[type] === todayDate) return;
+
+    const shareText = generatorFunc();
+    
+    if (!shareText) {
+      alert(isFr 
+        ? "Tu n'as rien entré aujourd'hui ! Ajoute des données avant de partager." 
+        : "You haven't logged anything today! Add data before sharing.");
+      return;
+    }
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: shareTitle,
+          title: 'Grindup Tracker',
           text: shareText,
-          url: window.location.href, 
         });
         completeShare(type, xpAmount);
       } else {
-        navigator.clipboard.writeText(`${shareText} - ${window.location.href}`);
-        alert(isFr ? "Lien copié ! Colle-le dans ta story ou à un ami." : "Link copied! Paste it in your story or to a friend.");
+        navigator.clipboard.writeText(shareText);
+        alert(isFr ? "Tes stats ont été copiées ! Colle-les dans ta story Instagram." : "Stats copied! Paste them in your Instagram story.");
         completeShare(type, xpAmount);
       }
     } catch (err) {
-      console.log("Partage annulé par l'utilisateur");
+      console.log("Partage annulé");
     }
   };
 
@@ -77,13 +130,12 @@ const Reward = ({ t, xp, setXp }) => {
     alert(vocab.successClaim);
   };
 
-  // NOUVELLES MATHÉMATIQUES LONG TERME :
   // 30 XP / jour max
   const tiers = [
-    { name: vocab.tier25, cost: 2700, value: 25 },  // ~3 mois (2700 XP)
-    { name: vocab.tier50, cost: 4500, value: 50 },  // ~5 mois (4500 XP)
-    { name: vocab.tier75, cost: 6000, value: 75 },  // ~6.5 mois (6000 XP)
-    { name: vocab.tier100, cost: 7200, value: 100 }, // ~8 mois (7200 XP)
+    { name: vocab.tier25, cost: 2700, value: 25 }, 
+    { name: vocab.tier50, cost: 4500, value: 50 }, 
+    { name: vocab.tier75, cost: 6000, value: 75 }, 
+    { name: vocab.tier100, cost: 7200, value: 100 },
   ];
 
   return (
@@ -142,7 +194,7 @@ const Reward = ({ t, xp, setXp }) => {
           {/* WORKOUT */}
           <button 
             disabled={shares.workout === todayDate}
-            onClick={() => handleShare('workout', 10, 'Grindup Training', isFr ? "Je viens de détruire mon workout grâce à Grindup.pro 🔥" : "Just crushed my workout with Grindup.pro 🔥")} 
+            onClick={() => handleShare('workout', 10, generateWorkoutText)} 
             className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
@@ -161,10 +213,32 @@ const Reward = ({ t, xp, setXp }) => {
             )}
           </button>
 
+          {/* DIÈTE / NUTRITION (Nouveau) */}
+          <button 
+            disabled={shares.diet === todayDate}
+            onClick={() => handleShare('diet', 10, generateDietText)} 
+            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-500/20 p-2 rounded-xl text-orange-400"><UtensilsCrossed size={20} /></div>
+              <div>
+                <p className="text-sm font-bold text-white">{vocab.shareDiet}</p>
+                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.shareDietDesc}</p>
+              </div>
+            </div>
+            {shares.diet === todayDate ? (
+               <CheckCircle2 size={20} className="text-[#ccff00]" />
+            ) : (
+              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <Share2 size={12}/> {vocab.btnShare}
+              </span>
+            )}
+          </button>
+
           {/* HABITUDES / BIOHACKING */}
           <button 
             disabled={shares.habits === todayDate}
-            onClick={() => handleShare('habits', 10, 'Grindup Biohacking', isFr ? "La discipline bat la motivation. Je track mes habitudes sur Grindup.pro 🧬" : "Discipline over motivation. Tracking my habits on Grindup.pro 🧬")} 
+            onClick={() => handleShare('habits', 10, generateHabitsText)} 
             className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
@@ -175,28 +249,6 @@ const Reward = ({ t, xp, setXp }) => {
               </div>
             </div>
             {shares.habits === todayDate ? (
-               <CheckCircle2 size={20} className="text-[#ccff00]" />
-            ) : (
-              <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                <Share2 size={12}/> {vocab.btnShare}
-              </span>
-            )}
-          </button>
-
-          {/* BUDGET */}
-          <button 
-            disabled={shares.budget === todayDate}
-            onClick={() => handleShare('budget', 10, 'Grindup Finances', isFr ? "Mon budget est calculé au millimètre sur Grindup.pro 💸" : "My budget is dialed in on Grindup.pro 💸")} 
-            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-pink-500/20 p-2 rounded-xl text-pink-400"><Wallet size={20} /></div>
-              <div>
-                <p className="text-sm font-bold text-white">{vocab.shareBudget}</p>
-                <p className="text-[10px] font-bold text-[#ccff00]">{vocab.shareBudgetDesc}</p>
-              </div>
-            </div>
-            {shares.budget === todayDate ? (
                <CheckCircle2 size={20} className="text-[#ccff00]" />
             ) : (
               <span className="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
