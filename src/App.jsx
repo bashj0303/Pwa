@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share } from 'lucide-react';
 
@@ -7,7 +6,7 @@ import Budget from './Budget';
 import Workout from './Workout';
 import Lab from './Lab';
 import Reward from './Reward';
-import Nutrition from './Nutrition'; // NOUVEAU FICHIER
+import Nutrition from './Nutrition';
 
 const App = () => {
   const loadState = (key, defaultValue) => {
@@ -29,7 +28,7 @@ const App = () => {
       tabWorkout: 'Training',
       tabLab: 'Lab',
       tabReward: 'Rewards',
-      tabNutrition: 'Diet', // TRADUCTION ONGLET NUTRITION
+      tabNutrition: 'Diet',
       goPremium: 'Go Premium',
       premiumDesc: 'Unlock cloud sync, advanced protocols and data export.',
       subscribe: 'Subscribe',
@@ -51,7 +50,7 @@ const App = () => {
       tabWorkout: 'Training',
       tabLab: 'Labo',
       tabReward: 'Rewards',
-      tabNutrition: 'Diète', // TRADUCTION ONGLET NUTRITION
+      tabNutrition: 'Diète',
       goPremium: 'Passez Premium',
       premiumDesc: 'Débloquez la synchro cloud, les protocoles avancés et l\'export.',
       subscribe: 'S\'abonner',
@@ -123,7 +122,9 @@ const App = () => {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPremium, setShowPremium] = useState(false);
-  const [xp, setXp] = useState(() => loadState('pos_xp', 140));
+  
+  // LE CORRECTIF EST ICI (pos_xp_v2 pour écraser le 140 et le mettre à 0)
+  const [xp, setXp] = useState(() => loadState('pos_xp_v2', 0));
 
   const [expenses] = useState(() => loadState('pos_budget_v5_m' + new Date().getMonth(), { fixed: [], variables: [], autoTransfers: [], incomeBase: 0, incomeTS: 0 }));
   const [payFreq] = useState(() => loadState('pos_pay_freq_v5', 2));
@@ -147,7 +148,7 @@ const App = () => {
     { id: 2, name: 'Incline DB Press', weight: 90, reps: '3x10' },
   ]));
 
-  useEffect(() => localStorage.setItem('pos_xp', JSON.stringify(xp)), [xp]);
+  useEffect(() => localStorage.setItem('pos_xp_v2', JSON.stringify(xp)), [xp]);
   useEffect(() => localStorage.setItem('pos_protocols', JSON.stringify(protocols)), [protocols]);
   useEffect(() => localStorage.setItem('pos_workouts', JSON.stringify(workouts)), [workouts]);
 
@@ -179,34 +180,6 @@ const App = () => {
             </button>
           </div>
         </header>
-
-        {showInstallPrompt && (
-          <div className="bg-[#ccff00] text-black p-4 rounded-2xl mx-4 mt-4 shadow-lg animate-in slide-in-from-top duration-500 relative">
-            <button onClick={dismissPrompt} className="absolute top-2 right-2 p-1 opacity-50 hover:opacity-100">
-              <Trash2 size={14} />
-            </button>
-            <div className="flex items-start gap-3">
-              <div className="bg-black/10 p-2 rounded-xl text-black mt-1"><Download size={20} /></div>
-              <div className="flex-1">
-                <p className="font-bold text-sm mb-1">{t.installApp}</p>
-                {isIOS ? (
-                  <div className="space-y-1 text-xs font-medium opacity-80">
-                    <p>{t.installIOS}</p>
-                    <p className="flex items-center gap-1">{t.step1} <Share size={12} /></p>
-                    <p>{t.step2}</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-[10px] opacity-80 font-medium mb-3">{t.installDesc}</p>
-                    <button onClick={handleInstallClick} className="w-full bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:scale-[1.02] transition-transform">
-                      {t.installBtn}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         <main className="flex-1 overflow-y-auto px-6 pt-6 pb-28 no-scrollbar">
           {activeTab === 'dashboard' && <Dashboard t={t} xp={xp} setXp={setXp} balance={balance} protocols={protocols} setProtocols={setProtocols} setActiveTab={setActiveTab} />}
@@ -245,25 +218,6 @@ const App = () => {
             })}
           </div>
         </nav>
-
-        {showPremium && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
-            <div className="bg-slate-800 border border-[#ccff00]/50 rounded-[2rem] w-full max-w-sm p-8 text-center relative shadow-[0_0_40px_rgba(204,255,0,0.15)]">
-              <Crown className="w-16 h-16 text-[#ccff00] mx-auto mb-4" />
-              <h2 className="text-2xl font-black text-white mb-2 tracking-tight">{t.goPremium}</h2>
-              <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-                {t.premiumDesc}
-              </p>
-              <div className="text-4xl font-black text-white mb-8">$4.99<span className="text-sm font-medium text-slate-500 ml-1">/ {t.month}</span></div>
-              <button className="w-full bg-[#ccff00] text-black font-black uppercase tracking-wider py-4 rounded-xl mb-3 hover:scale-105 transition-transform">
-                {t.subscribe}
-              </button>
-              <button onClick={() => setShowPremium(false)} className="w-full text-slate-500 font-bold py-3 text-sm hover:text-white transition-colors">
-                {t.cancel}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
