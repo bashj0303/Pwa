@@ -44,7 +44,7 @@ const Nutrition = ({ t }) => {
 
   const [showSettings, setShowSettings] = useState(false);
   
-  // Obtenir l'heure actuelle pour pré-remplir l'input
+  // Obtenir l'heure actuelle
   const now = new Date();
   const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
@@ -67,21 +67,18 @@ const Nutrition = ({ t }) => {
     setTotals(t);
   }, [foods]);
 
-  // Gestion intelligente de la saisie (Multiplicateur auto)
+  // Gestion intelligente de la saisie
   const handleNameChange = (val) => {
     setForm(prev => ({ ...prev, name: val }));
     const lowerText = val.toLowerCase();
     
-    // Cherche si un mot de la base de données est dans le texte
     const matchKey = Object.keys(DB).find(key => lowerText.includes(key));
 
     if (matchKey) {
       const data = DB[matchKey];
-      // Cherche un nombre dans la saisie (ex: "poulet 200" trouve "200")
       const qtyMatch = val.match(/(\d+)/);
       const qty = qtyMatch ? parseFloat(qtyMatch[0]) : (data.u.includes('100g') ? 100 : 1);
       
-      // Calcule le ratio par rapport à la base (qui est pour 100g ou 1 unité)
       const ratio = data.u.includes('100g') ? qty / 100 : qty;
 
       setForm(prev => ({
@@ -104,7 +101,7 @@ const Nutrition = ({ t }) => {
       p: Number(form.p) || 0,
       c: Number(form.c) || 0,
       f: Number(form.f) || 0
-    }].sort((a, b) => a.time.localeCompare(b.time))); // Garde la liste triée par heure
+    }].sort((a, b) => a.time.localeCompare(b.time)));
 
     setForm({ name: '', k: '', p: '', c: '', f: '' });
   };
@@ -116,7 +113,7 @@ const Nutrition = ({ t }) => {
   const getPercent = (current, max) => Math.min(100, Math.round((current / max) * 100));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-48">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-56">
       
       {/* HEADER & JAUGES DE MACROS */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-[2rem] shadow-xl relative">
@@ -134,26 +131,26 @@ const Nutrition = ({ t }) => {
           </div>
         </div>
 
-        {/* SECTION REGLAGES OBJECTIFS (Cachée par défaut) */}
+        {/* SECTION REGLAGES OBJECTIFS */}
         {showSettings && (
           <div className="mb-6 p-4 bg-black/40 rounded-xl border border-slate-700/50 animate-in fade-in">
             <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">{vocab.setGoalsTitle}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-800 p-2 rounded-lg">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">Calories</span>
-                <input type="number" value={goals.calories} onChange={e => setGoals({...goals, calories: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-sm focus:outline-none" />
+                <input type="number" value={goals.calories} onChange={e => setGoals({...goals, calories: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" />
               </div>
               <div className="bg-slate-800 p-2 rounded-lg border-l-2 border-blue-500">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">Protéines (g)</span>
-                <input type="number" value={goals.protein} onChange={e => setGoals({...goals, protein: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-sm focus:outline-none" />
+                <input type="number" value={goals.protein} onChange={e => setGoals({...goals, protein: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" />
               </div>
               <div className="bg-slate-800 p-2 rounded-lg border-l-2 border-amber-500">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">Glucides (g)</span>
-                <input type="number" value={goals.carbs} onChange={e => setGoals({...goals, carbs: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-sm focus:outline-none" />
+                <input type="number" value={goals.carbs} onChange={e => setGoals({...goals, carbs: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" />
               </div>
               <div className="bg-slate-800 p-2 rounded-lg border-l-2 border-purple-500">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">Lipides (g)</span>
-                <input type="number" value={goals.fat} onChange={e => setGoals({...goals, fat: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-sm focus:outline-none" />
+                <input type="number" value={goals.fat} onChange={e => setGoals({...goals, fat: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" />
               </div>
             </div>
           </div>
@@ -225,50 +222,50 @@ const Nutrition = ({ t }) => {
         ))}
       </div>
 
-      {/* PANNEAU DE SAISIE FLOTTANT */}
-      <div className="fixed bottom-[75px] left-0 right-0 bg-[#0f172a]/90 backdrop-blur-xl border-t border-slate-800 p-3 z-30 flex justify-center">
-        <div className="w-full max-w-md space-y-2">
+      {/* PANNEAU DE SAISIE FLOTTANT CORRIGÉ (CENTRE & ANTI-ZOOM) */}
+      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-y border-slate-800/80 p-4 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div className="w-full space-y-3">
             
             <div className="flex gap-2">
               <input 
                 type="time" 
                 value={timeStr} 
                 onChange={e => setTimeStr(e.target.value)}
-                className="w-16 bg-slate-900 border border-slate-700 rounded-xl px-1 text-center text-xs font-bold text-[#ccff00] outline-none"
+                className="w-20 bg-slate-900 border border-slate-700 rounded-xl px-1 text-center text-[16px] font-bold text-[#ccff00] outline-none"
               />
               <input 
                 type="text" 
                 value={form.name}
                 onChange={e => handleNameChange(e.target.value)}
                 placeholder={vocab.namePlaceholder}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-[#ccff00] placeholder-slate-600"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[16px] font-bold text-white outline-none focus:border-[#ccff00] placeholder-slate-600"
               />
             </div>
 
             <div className="flex gap-2">
               {[
                 { l: 'Kcal', v: form.k, k: 'k', c: 'text-orange-500 border-orange-500/30' },
-                { l: 'P', v: form.p, k: 'p', c: 'text-blue-500 border-blue-500/30' },
-                { l: 'G', v: form.c, k: 'c', c: 'text-amber-500 border-amber-500/30' },
-                { l: 'L', v: form.f, k: 'f', c: 'text-purple-500 border-purple-500/30' },
+                { l: 'Pro', v: form.p, k: 'p', c: 'text-blue-500 border-blue-500/30' },
+                { l: 'Glu', v: form.c, k: 'c', c: 'text-amber-500 border-amber-500/30' },
+                { l: 'Lip', v: form.f, k: 'f', c: 'text-purple-500 border-purple-500/30' },
               ].map((f, i) => (
-                <div key={i} className="flex-1 relative mt-1">
-                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#0f172a] px-1 text-[8px] font-bold text-slate-500 uppercase">{f.l}</span>
+                <div key={i} className="flex-1 relative mt-2">
+                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#0f172a] px-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider">{f.l}</span>
                    <input 
                     type="number" 
                     placeholder="0"
                     value={f.v === 0 ? '' : f.v} 
                     onChange={e => setForm({...form, [f.k]: e.target.value})} 
-                    className={`w-full py-2 bg-slate-900 border rounded-xl text-center text-xs font-black outline-none ${f.c}`} 
+                    className={`w-full py-2 bg-slate-900 border rounded-xl text-center text-[16px] font-black outline-none ${f.c}`} 
                   />
                 </div>
               ))}
               <button 
                 onClick={addEntry}
                 disabled={!form.name}
-                className="w-16 bg-[#ccff00] disabled:bg-slate-800 disabled:text-slate-600 text-black rounded-xl hover:bg-[#b3e600] transition font-black uppercase text-[10px] tracking-wider flex items-center justify-center"
+                className="w-12 bg-[#ccff00] disabled:bg-slate-800 disabled:text-slate-600 text-black rounded-xl hover:bg-[#b3e600] transition font-black flex items-center justify-center mt-2"
               >
-                <Plus size={18} />
+                <Plus size={20} />
               </button>
             </div>
 
