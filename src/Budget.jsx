@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Trash2, Save, Check } from 'lucide-react';
 
@@ -24,17 +23,18 @@ const Budget = ({ t }) => {
     total: 'Total',
     max: 'Max',
     fixedTitle: isFr ? '🔒 Charges Fixes' : '🔒 Fixed Costs',
-    namePrompt: isFr ? 'Nom ?' : 'Name?',
+    // Ajout d'une petite astuce pour les emojis !
+    namePrompt: isFr ? 'Nom ? (Astuce: mets un emoji 🍕 au début)' : 'Name? (Tip: put an emoji 🍕 first)',
     
     // Noms des catégories par défaut (dynamiques)
-    catSavings: isFr ? 'Épargne' : 'Savings',
-    catInv: isFr ? 'Investissement' : 'Investment',
-    catGroc: isFr ? 'Épicerie' : 'Groceries',
-    catGas: isFr ? 'Essence' : 'Gas',
-    catResto: isFr ? 'Resto' : 'Restaurants',
-    catHome: isFr ? 'Divers Maison' : 'Home Misc',
-    catLeisure: isFr ? 'Sortie / Loisirs' : 'Entertainment',
-    catHealth: isFr ? 'Perso / Santé' : 'Health & Personal',
+    catSavings: isFr ? '💰 Épargne' : '💰 Savings',
+    catInv: isFr ? '📈 Investissement' : '📈 Investment',
+    catGroc: isFr ? '🛒 Épicerie' : '🛒 Groceries',
+    catGas: isFr ? '⛽ Essence' : '⛽ Gas',
+    catResto: isFr ? '🍔 Resto' : '🍔 Restaurants',
+    catHome: isFr ? '🏠 Divers Maison' : '🏠 Home Misc',
+    catLeisure: isFr ? '🎟️ Sortie / Loisirs' : '🎟️ Entertainment',
+    catHealth: isFr ? '💊 Perso / Santé' : '💊 Health & Personal',
     catRent: isFr ? '🏠 Loyer' : '🏠 Rent',
     catPhone: isFr ? '📱 Cellulaire' : '📱 Phone',
   };
@@ -107,7 +107,6 @@ const Budget = ({ t }) => {
     if (name) {
       setMonthData(prev => ({
         ...prev,
-        // Un item ajouté par l'utilisateur a un "name" brut, pas de "nameKey"
         [listName]: [...prev[listName], { ...defaultItem, id: Date.now(), name }]
       }));
     }
@@ -130,7 +129,7 @@ const Budget = ({ t }) => {
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300 pb-10">
+    <div className="space-y-4 animate-in fade-in duration-300 pb-10 overflow-hidden">
       
       {/* HEADER SLIM */}
       <div className="flex justify-between items-center">
@@ -144,13 +143,13 @@ const Budget = ({ t }) => {
         </button>
       </div>
 
-      {/* SÉLECTEUR DE MOIS */}
-      <div className="flex overflow-x-auto gap-1.5 pb-2 no-scrollbar">
+      {/* SÉLECTEUR DE MOIS (Scrolable) */}
+      <div className="flex overflow-x-auto gap-1.5 pb-2 no-scrollbar snap-x w-full">
         {vocab.months.map((m, i) => (
           <button
             key={i}
             onClick={() => changeMonth(i)}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors ${activeMonth === i ? 'bg-[#ccff00] text-black' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+            className={`shrink-0 snap-start whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors ${activeMonth === i ? 'bg-[#ccff00] text-black' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
           >
             {m}
           </button>
@@ -170,10 +169,11 @@ const Budget = ({ t }) => {
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-slate-800/60 rounded-xl p-2.5 border border-slate-700">
           <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">{vocab.base}</p>
+          {/* Remplacement par text-[16px] pour éviter le zoom iOS */}
           <input 
             type="number" placeholder="0" value={monthData.incomeBase === 0 ? '' : monthData.incomeBase} 
             onChange={(e) => updateData('incomeBase', e.target.value)}
-            className="bg-transparent text-white font-black text-lg w-full focus:outline-none placeholder-slate-600"
+            className="bg-transparent text-white font-black text-[16px] w-full focus:outline-none placeholder-slate-600"
           />
         </div>
         <div className="bg-slate-800/60 rounded-xl p-2.5 border border-slate-700">
@@ -181,7 +181,7 @@ const Budget = ({ t }) => {
           <input 
             type="number" placeholder="0" value={monthData.incomeTS === 0 ? '' : monthData.incomeTS} 
             onChange={(e) => updateData('incomeTS', e.target.value)}
-            className="bg-transparent text-white font-black text-lg w-full focus:outline-none placeholder-slate-600"
+            className="bg-transparent text-white font-black text-[16px] w-full focus:outline-none placeholder-slate-600"
           />
         </div>
       </div>
@@ -204,7 +204,7 @@ const Budget = ({ t }) => {
               <input 
                 type="number" placeholder="0" value={a.amount === 0 ? '' : a.amount} 
                 onChange={e => updateListItem('autoTransfers', a.id, 'amount', e.target.value)} 
-                className="bg-transparent text-[#ccff00] font-black w-14 text-right text-xs focus:outline-none placeholder-slate-600" 
+                className="bg-transparent text-[#ccff00] font-black w-16 text-right text-[16px] focus:outline-none placeholder-slate-600" 
               />
               <span className="text-[10px] text-slate-500 ml-1">$</span>
               <button onClick={() => deleteListItem('autoTransfers', a.id)} className="text-slate-600 hover:text-red-400 p-1 ml-1"><Trash2 size={12}/></button>
@@ -248,7 +248,7 @@ const Budget = ({ t }) => {
                     <input 
                       type="number" placeholder="0" value={v.spent === 0 ? '' : v.spent} 
                       onChange={(e) => updateListItem('variables', v.id, 'spent', e.target.value)} 
-                      className="bg-transparent text-white font-bold w-full text-right focus:outline-none text-xs placeholder-slate-600" 
+                      className="bg-transparent text-white font-bold w-full text-right focus:outline-none text-[16px] placeholder-slate-600" 
                     />
                   </div>
                   
@@ -256,7 +256,7 @@ const Budget = ({ t }) => {
                     const itemName = v.nameKey ? vocab[v.nameKey] : v.name;
                     const add = prompt(`+ ${itemName} ?`, "10");
                     if(add) addVariableAmount(v.id, Number(add));
-                  }} className="w-7 h-7 bg-[#ccff00]/10 text-[#ccff00] rounded-md flex items-center justify-center font-black text-sm hover:bg-[#ccff00] hover:text-black">
+                  }} className="w-8 h-8 bg-[#ccff00]/10 text-[#ccff00] rounded-md flex items-center justify-center font-black text-sm hover:bg-[#ccff00] hover:text-black">
                     +
                   </button>
 
@@ -265,7 +265,7 @@ const Budget = ({ t }) => {
                     <input 
                       type="number" placeholder="0" value={v.max === 0 ? '' : v.max} 
                       onChange={(e) => updateListItem('variables', v.id, 'max', e.target.value)} 
-                      className="bg-transparent text-[#ccff00] font-bold w-full text-right focus:outline-none text-xs placeholder-slate-600" 
+                      className="bg-transparent text-[#ccff00] font-bold w-full text-right focus:outline-none text-[16px] placeholder-slate-600" 
                     />
                   </div>
                 </div>
@@ -294,7 +294,7 @@ const Budget = ({ t }) => {
                 <input 
                   type="number" placeholder="0" value={f.amount === 0 ? '' : f.amount} 
                   onChange={(e) => updateListItem('fixed', f.id, 'amount', e.target.value)}
-                  className="bg-transparent text-white font-black w-14 text-right focus:outline-none text-xs placeholder-slate-600"
+                  className="bg-transparent text-white font-black w-16 text-right focus:outline-none text-[16px] placeholder-slate-600"
                 />
                 <span className="text-[10px] text-slate-500">$</span>
                 <button onClick={() => deleteListItem('fixed', f.id)} className="text-slate-600 hover:text-red-400 p-1">
