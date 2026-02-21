@@ -33,9 +33,14 @@ const Lab = ({ t }) => {
     protocolHeader: isFr ? '📖 Protocole Standard' : '📖 Standard Protocol',
     
     errorNoMg: isFr ? 'Veuillez entrer les mg de votre fiole.' : 'Please enter the vial mg.',
+    
+    // NOUVEAU : Avertissement de petite seringue
+    syringeWarning: isFr 
+      ? "💡 Petite dose détectée : Utilisez une seringue de 0.3ml ou 0.5ml pour bien voir les graduations (difficile à lire sur une 1ml standard)." 
+      : "💡 Small dose detected: Use a 0.3ml or 0.5ml syringe to clearly see the tick marks (hard to read on a standard 1ml).",
   };
 
-  // --- BASE DE DONNÉES PEPTIDES (A-Z tirée de ta liste) ---
+  // --- BASE DE DONNÉES PEPTIDES (A-Z) ---
   const peptideDB = [
     { name: '5-Amino-1MQ', stdDose: 5000, protFr: '5mg par jour (si injectable).', protEn: '5mg daily (if injectable format).' },
     { name: 'ARA-290', stdDose: 400, protFr: '400mcg par jour pendant 30 jours consécutifs.', protEn: '400mcg daily for 30 consecutive days.' },
@@ -294,6 +299,16 @@ const Lab = ({ t }) => {
               </div>
               <Syringe className="text-[#ccff00]/30" size={32} />
             </div>
+
+            {/* NOUVEAU : AVERTISSEMENT SI PETITE DOSE (5 unités ou moins) */}
+            {calcUnits <= 5 && (
+              <div className="bg-orange-500/10 border border-orange-500/50 p-3 rounded-xl flex items-start gap-2 mt-4 animate-in fade-in">
+                <AlertTriangle size={18} className="text-orange-500 shrink-0 mt-0.5" />
+                <p className="text-orange-400 text-xs font-medium leading-tight">
+                  {vocab.syringeWarning}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* CARTE PROTOCOLE */}
