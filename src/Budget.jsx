@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Check, PieChart, Target, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Save, Check, PieChart, Target, BarChart3, CalendarDays } from 'lucide-react';
 
 const Budget = ({ t }) => {
   const isFr = t.month === 'mois';
@@ -23,6 +22,13 @@ const Budget = ({ t }) => {
     freq2: isFr ? '2 / mois (Aux 2 sem)' : '2 / month (Bi-weekly)',
     freq4: isFr ? '4 / mois (Hebdo)' : '4 / month (Weekly)',
     perPay: isFr ? '/ paie' : '/ pay',
+    
+    // Nouveaux termes Annuels
+    annualTitle: isFr ? '📅 Provisions Annuelles' : '📅 Annual Provisions',
+    annualDesc: isFr ? 'Divisé par paie pour zéro stress' : 'Divided per pay for zero stress',
+    perYear: isFr ? '/ an' : '/ yr',
+    annualToSave: isFr ? 'À mettre de côté' : 'To set aside',
+
     varExpensesTitle: isFr ? '🛒 Variables (Clic & Ajoute)' : '🛒 Variables (Click & Add)',
     left: isFr ? 'Reste' : 'Left',
     total: 'Total',
@@ -30,7 +36,6 @@ const Budget = ({ t }) => {
     fixedTitle: isFr ? '🔒 Charges Fixes' : '🔒 Fixed Costs',
     namePrompt: isFr ? 'Nom ? (Astuce: mets un emoji 🍕 au début)' : 'Name? (Tip: put an emoji 🍕 first)',
     
-    // Noms liés par ID (pour que la langue change automatiquement)
     catSavings: isFr ? '💰 Épargne' : '💰 Savings',
     catInv: isFr ? '📈 Investissement' : '📈 Investment',
     catGroc: isFr ? '🛒 Épicerie' : '🛒 Groceries',
@@ -52,6 +57,7 @@ const Budget = ({ t }) => {
     btnYear: isFr ? 'Année' : 'Year',
     sumIncome: isFr ? 'Revenus' : 'Income',
     sumSaved: isFr ? 'Mis de côté' : 'Saved',
+    sumAnnuals: isFr ? 'Provisions Annuelles' : 'Annual Provisions',
     sumFixed: isFr ? 'Charges Fixes' : 'Fixed Costs',
     sumVar: isFr ? 'Variables' : 'Variables',
     sumTotalOut: isFr ? 'Total Sortant' : 'Total Outgoing',
@@ -67,16 +73,24 @@ const Budget = ({ t }) => {
     return saved ? Number(saved) : 2; 
   });
 
-  // Objectifs liés à l'ID (plus au nom, donc ça résiste au changement de langue !)
   const [targets, setTargets] = useState(() => {
     const saved = localStorage.getItem('pos_targets_v5');
     return saved ? JSON.parse(saved) : {};
   });
 
+  // NOUVEAU : Dépenses annuelles globales (valable pour toute l'année)
+  const [annuals, setAnnuals] = useState(() => {
+    const saved = localStorage.getItem('pos_annuals_v1');
+    return saved ? JSON.parse(saved) : [
+      { id: 101, name: isFr ? '🚗 Plaque Auto' : '🚗 Car Reg.', amount: 350 },
+      { id: 102, name: isFr ? '🛡️ Assurances' : '🛡️ Insurance', amount: 500 }
+    ];
+  });
+
   useEffect(() => localStorage.setItem('pos_pay_freq_v5', payFreq.toString()), [payFreq]);
   useEffect(() => localStorage.setItem('pos_targets_v5', JSON.stringify(targets)), [targets]);
+  useEffect(() => localStorage.setItem('pos_annuals_v1', JSON.stringify(annuals)), [annuals]);
 
-  // V5 : Remise à zéro pour forcer l'architecture bilingue sur les Objectifs
   const loadMonthData = (monthIndex) => {
     const saved = localStorage.getItem(`pos_budget_v5_m${monthIndex}`);
     if (saved) return JSON.parse(saved);
@@ -117,14 +131,21 @@ const Budget = ({ t }) => {
     setMonthData(loadMonthData(index));
   };
 
-  // --- CALCULS ---
+  // --- CALCULS ANNUELS & PROVISIONS ---
+  const totalAnnualCost = annuals.reduce((sum, item) => sum + Number(item.amount), 0);
+  const payPeriodsPerYear = payFreq * 12;
+  const annualProvisionPerPay = payPeriodsPerYear > 0 ? (totalAnnualCost / payPeriodsPerYear) : 0;
+  const annualProvisionMonthly = annualProvisionPerPay * payFreq; // Équivaut à / 12
+
+  // --- CALCULS DU MOIS ACTUEL ---
   const totalIncome = Number(monthData.incomeBase) + Number(monthData.incomeTS);
   const autoTransferPerPay = monthData.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0);
   const totalAutoTransferMonthly = autoTransferPerPay * payFreq; 
   const totalFixed = monthData.fixed.reduce((sum, item) => sum + Number(item.amount), 0);
   const totalVariablesSpent = monthData.variables.reduce((sum, item) => sum + Number(item.spent), 0);
   
-  const totalOutgoing = totalAutoTransferMonthly + totalFixed + totalVariablesSpent;
+  // Total sortant inclut maintenant la provision annuelle du mois !
+  const totalOutgoing = totalAutoTransferMonthly + annualProvisionMonthly + totalFixed + totalVariablesSpent;
   const pocketMoney = totalIncome - totalOutgoing;
 
   let yearlyIncome = 0;
@@ -139,7 +160,9 @@ const Budget = ({ t }) => {
     yearlyFixed += dataToCalc.fixed.reduce((sum, item) => sum + Number(item.amount), 0);
     yearlyVar += dataToCalc.variables.reduce((sum, item) => sum + Number(item.spent), 0);
   }
-  const yearlyOutgoing = yearlySaved + yearlyFixed + yearlyVar;
+  
+  // Total sortant de l'année inclut la vraie dépense annuelle totale
+  const yearlyOutgoing = yearlySaved + totalAnnualCost + yearlyFixed + yearlyVar;
 
   // --- FONCTIONS DE GESTION ---
   const updateData = (key, value) => setMonthData(prev => ({ ...prev, [key]: value }));
@@ -167,7 +190,6 @@ const Budget = ({ t }) => {
         ...prev,
         [listName]: prev[listName].filter(item => item.id !== id)
       }));
-      // Nettoyer les objectifs si la catégorie est supprimée
       if (listName === 'autoTransfers') {
         const newTargets = { ...targets };
         delete newTargets[id];
@@ -183,7 +205,6 @@ const Budget = ({ t }) => {
     }));
   };
 
-  // Ajout / Modification d'un objectif (Lié à l'ID)
   const setGoalTarget = (id, currentName) => {
     const current = targets[id] || '';
     const val = prompt(`${vocab.goalPrompt}\n[ ${currentName} ]`, current);
@@ -193,6 +214,22 @@ const Budget = ({ t }) => {
       if (num > 0) newTargets[id] = num;
       else delete newTargets[id]; 
       setTargets(newTargets);
+    }
+  };
+
+  // Gestion des provisions annuelles
+  const addAnnual = () => {
+    const name = prompt(vocab.namePrompt);
+    if (name) setAnnuals([...annuals, { id: Date.now(), name, amount: 0 }]);
+  };
+
+  const updateAnnual = (id, value) => {
+    setAnnuals(annuals.map(a => a.id === id ? { ...a, amount: Number(value) } : a));
+  };
+
+  const deleteAnnual = (id) => {
+    if(window.confirm(isFr ? "Supprimer ?" : "Delete?")) {
+      setAnnuals(annuals.filter(a => a.id !== id));
     }
   };
 
@@ -253,7 +290,7 @@ const Budget = ({ t }) => {
         </div>
       </div>
 
-      {/* VIREMENTS AUTO (AVEC CALCUL DU TOTAL) */}
+      {/* VIREMENTS AUTO */}
       <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700">
         <div className="flex justify-between items-center mb-3">
           <h4 className="text-white font-bold text-xs">{vocab.autoTransferTitle}</h4>
@@ -268,7 +305,6 @@ const Budget = ({ t }) => {
           </select>
         </div>
 
-        {/* NOUVEAU : BOÎTE EXPLICITE DU TOTAL À TRANSFÉRER */}
         <div className="bg-black/40 border border-slate-700/50 rounded-lg p-2 mb-3 flex justify-between items-center">
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.totalToTransfer} :</span>
           <div className="text-right">
@@ -289,16 +325,12 @@ const Budget = ({ t }) => {
                   className="bg-transparent text-[#ccff00] font-black w-14 text-right text-[16px] focus:outline-none placeholder-slate-600" 
                 />
                 <span className="text-[10px] text-slate-500 ml-1 mr-2">$</span>
-                
-                {/* BOUTON CIBLE (GOAL) LIÉ À L'ID */}
                 <button 
                   onClick={() => setGoalTarget(a.id, itemName)} 
                   className={`p-1.5 rounded-md transition-colors ${targets[a.id] ? 'bg-[#ccff00]/20 text-[#ccff00]' : 'text-slate-500 hover:text-[#ccff00] hover:bg-slate-800'}`}
-                  title="Lier à un objectif"
                 >
                   <Target size={14} />
                 </button>
-                
                 <button onClick={() => deleteListItem('autoTransfers', a.id)} className="text-slate-600 hover:text-red-400 p-1.5 ml-1">
                   <Trash2 size={14} />
                 </button>
@@ -308,6 +340,44 @@ const Budget = ({ t }) => {
           <button onClick={() => addListItem('autoTransfers', {amount: 0})} className="w-full mt-2 py-1.5 border border-dashed border-slate-600 rounded-lg text-slate-500 hover:text-[#ccff00] hover:border-[#ccff00]/50 transition-colors flex justify-center">
             <Plus size={14}/>
           </button>
+        </div>
+      </div>
+
+      {/* NOUVEAU : PROVISIONS ANNUELLES */}
+      <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-1.5">
+            <CalendarDays size={14} className="text-blue-400" />
+            <h4 className="text-white font-bold text-xs">{vocab.annualTitle}</h4>
+          </div>
+          <button onClick={addAnnual} className="text-blue-400 p-1 bg-black/30 rounded hover:bg-black/50"><Plus size={14}/></button>
+        </div>
+        
+        <p className="text-[9px] text-slate-400 mb-3">{vocab.annualDesc}</p>
+
+        <div className="space-y-1.5 mb-3">
+          {annuals.map(a => (
+            <div key={a.id} className="flex items-center bg-black/20 p-1.5 rounded-lg border border-slate-700/30">
+              <span className="text-xs font-bold text-slate-300 flex-1 ml-1 truncate">{a.name}</span>
+              <input 
+                type="number" placeholder="0" value={a.amount === 0 ? '' : a.amount} 
+                onChange={e => updateAnnual(a.id, e.target.value)} 
+                className="bg-transparent text-blue-400 font-black w-14 text-right text-[16px] focus:outline-none placeholder-slate-600" 
+              />
+              <span className="text-[10px] text-slate-500 ml-1 mr-2">{vocab.perYear}</span>
+              <button onClick={() => deleteAnnual(a.id)} className="text-slate-600 hover:text-red-400 p-1.5 ml-1">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-black/40 border border-slate-700/50 rounded-lg p-2 flex justify-between items-center">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.annualToSave} :</span>
+          <div className="text-right">
+            <span className="text-sm font-black text-blue-400">{annualProvisionPerPay.toFixed(0)} $</span>
+            <span className="text-[9px] text-slate-500 ml-1">{vocab.perPay}</span>
+          </div>
         </div>
       </div>
 
@@ -417,15 +487,12 @@ const Budget = ({ t }) => {
             <div className="space-y-4">
               {Object.entries(targets).map(([goalIdStr, goalTarget]) => {
                 const goalId = Number(goalIdStr);
-                
-                // Récupérer le nom de l'objectif via l'ID
                 const transferItem = monthData.autoTransfers.find(a => a.id === goalId);
                 let goalName = "Objectif";
                 if (transferItem) {
                   goalName = transferItem.nameKey ? vocab[transferItem.nameKey] : transferItem.name;
                 }
 
-                // Calculer l'argent mis de côté sur toute l'année
                 let savedForThisGoal = 0;
                 for (let i = 0; i < 12; i++) {
                   const mData = (i === activeMonth) ? monthData : loadMonthData(i);
@@ -457,7 +524,7 @@ const Budget = ({ t }) => {
           )}
         </div>
 
-        {/* SOMMAIRE AVEC BOUTON BASCULE (MOIS / ANNÉE) */}
+        {/* SOMMAIRE AVEC BOUTON BASCULE */}
         <div className="bg-slate-900 border border-slate-700 p-5 rounded-[2rem] shadow-xl relative overflow-hidden mb-8">
           <div className="absolute -bottom-10 -right-10 opacity-5 pointer-events-none">
             <BarChart3 size={140} />
@@ -496,6 +563,12 @@ const Budget = ({ t }) => {
               <span className="text-sm font-black text-[#ccff00]">{summaryView === 'month' ? totalAutoTransferMonthly : yearlySaved} $</span>
             </div>
 
+            {/* NOUVEAU : LIGNE PROVISIONS DANS LE SOMMAIRE */}
+            <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
+              <span className="text-[11px] font-bold text-blue-400">{vocab.sumAnnuals}</span>
+              <span className="text-sm font-black text-blue-400">{summaryView === 'month' ? annualProvisionMonthly.toFixed(0) : totalAnnualCost} $</span>
+            </div>
+
             <div className="flex justify-between items-center bg-black/20 p-2.5 rounded-xl border border-slate-800/50">
               <span className="text-[11px] font-bold text-slate-300">{vocab.sumFixed}</span>
               <span className="text-sm font-black text-slate-300">{summaryView === 'month' ? totalFixed : yearlyFixed} $</span>
@@ -511,7 +584,7 @@ const Budget = ({ t }) => {
             <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-red-500/20">
               <span className="text-xs font-black text-red-400 uppercase tracking-wider">{vocab.sumTotalOut}</span>
               <span className="text-base font-black text-red-400">
-                {summaryView === 'month' ? totalOutgoing : yearlyOutgoing} $
+                {(summaryView === 'month' ? totalOutgoing : yearlyOutgoing).toFixed(0)} $
               </span>
             </div>
           </div>
