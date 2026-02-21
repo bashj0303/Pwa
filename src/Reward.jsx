@@ -17,14 +17,15 @@ const Reward = ({ t, xp, setXp }) => {
     
     waysToEarn: isFr ? 'Missions Quotidiennes (Social)' : 'Daily Missions (Social)',
     
+    // Nouveaux montants ajustés
     shareWorkout: isFr ? 'Partager mon Workout' : 'Share my Workout',
-    shareWorkoutDesc: isFr ? 'Montre ta session du jour (+50 XP)' : 'Flex today\'s session (+50 XP)',
+    shareWorkoutDesc: isFr ? 'Montre ta session du jour (+10 XP)' : 'Flex today\'s session (+10 XP)',
     
     shareHabits: isFr ? 'Partager mes Habitudes' : 'Share my Habits',
-    shareHabitsDesc: isFr ? 'Montre ta constance (+50 XP)' : 'Flex your consistency (+50 XP)',
+    shareHabitsDesc: isFr ? 'Montre ta constance (+10 XP)' : 'Flex your consistency (+10 XP)',
     
     shareBudget: isFr ? 'Partager mon Budget' : 'Share my Budget',
-    shareBudgetDesc: isFr ? 'Montre ta discipline financière (+50 XP)' : 'Flex your financial discipline (+50 XP)',
+    shareBudgetDesc: isFr ? 'Montre ta discipline financière (+10 XP)' : 'Flex your financial discipline (+10 XP)',
 
     btnShare: isFr ? 'Partager' : 'Share',
     btnDone: isFr ? 'Fait aujourd\'hui' : 'Done today',
@@ -34,7 +35,7 @@ const Reward = ({ t, xp, setXp }) => {
       : "Congrats! Screenshot this and DM us on Instagram @Grindwear for your code!"
   };
 
-  // --- LOGIQUE ANTI-SCAM (COOLDOWNS QUOTIDIENS) ---
+  // Cooldown quotidien
   const todayDate = new Date().toDateString();
 
   const [shares, setShares] = useState(() => {
@@ -47,7 +48,6 @@ const Reward = ({ t, xp, setXp }) => {
   }, [shares]);
 
   const handleShare = async (type, xpAmount, shareTitle, shareText) => {
-    // Vérifier si déjà fait aujourd'hui
     if (shares[type] === todayDate) return;
 
     try {
@@ -55,20 +55,16 @@ const Reward = ({ t, xp, setXp }) => {
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: window.location.href, // Envoie le lien de ton app
+          url: window.location.href, 
         });
-        
-        // Si le partage natif réussit
         completeShare(type, xpAmount);
       } else {
-        // Fallback si on est sur un vieil ordi qui n'a pas la fonction "Partager"
         navigator.clipboard.writeText(`${shareText} - ${window.location.href}`);
         alert(isFr ? "Lien copié ! Colle-le dans ta story ou à un ami." : "Link copied! Paste it in your story or to a friend.");
         completeShare(type, xpAmount);
       }
     } catch (err) {
-      console.log("Partage annulé par l'utilisateur", err);
-      // On ne donne pas les points s'il annule le menu de partage
+      console.log("Partage annulé par l'utilisateur");
     }
   };
 
@@ -79,15 +75,15 @@ const Reward = ({ t, xp, setXp }) => {
 
   const handleClaim = (amount) => {
     alert(vocab.successClaim);
-    // Optionnel : Tu pourrais déduire les XP ici si tu veux qu'ils "dépensent" leurs points :
-    // setXp(prev => prev - (amount * 100)); 
   };
 
+  // NOUVELLES MATHÉMATIQUES LONG TERME :
+  // 30 XP / jour max
   const tiers = [
-    { name: vocab.tier25, cost: 2500, value: 25 },
-    { name: vocab.tier50, cost: 5000, value: 50 },
-    { name: vocab.tier75, cost: 7500, value: 75 },
-    { name: vocab.tier100, cost: 10000, value: 100 },
+    { name: vocab.tier25, cost: 2700, value: 25 },  // ~3 mois (2700 XP)
+    { name: vocab.tier50, cost: 4500, value: 50 },  // ~5 mois (4500 XP)
+    { name: vocab.tier75, cost: 6000, value: 75 },  // ~6.5 mois (6000 XP)
+    { name: vocab.tier100, cost: 7200, value: 100 }, // ~8 mois (7200 XP)
   ];
 
   return (
@@ -146,7 +142,7 @@ const Reward = ({ t, xp, setXp }) => {
           {/* WORKOUT */}
           <button 
             disabled={shares.workout === todayDate}
-            onClick={() => handleShare('workout', 50, 'Grindup Training', isFr ? "Je viens de détruire mon workout grâce à Grindup.pro 🔥" : "Just crushed my workout with Grindup.pro 🔥")} 
+            onClick={() => handleShare('workout', 10, 'Grindup Training', isFr ? "Je viens de détruire mon workout grâce à Grindup.pro 🔥" : "Just crushed my workout with Grindup.pro 🔥")} 
             className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
@@ -168,7 +164,7 @@ const Reward = ({ t, xp, setXp }) => {
           {/* HABITUDES / BIOHACKING */}
           <button 
             disabled={shares.habits === todayDate}
-            onClick={() => handleShare('habits', 50, 'Grindup Biohacking', isFr ? "La discipline bat la motivation. Je track mes habitudes sur Grindup.pro 🧬" : "Discipline over motivation. Tracking my habits on Grindup.pro 🧬")} 
+            onClick={() => handleShare('habits', 10, 'Grindup Biohacking', isFr ? "La discipline bat la motivation. Je track mes habitudes sur Grindup.pro 🧬" : "Discipline over motivation. Tracking my habits on Grindup.pro 🧬")} 
             className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
@@ -190,7 +186,7 @@ const Reward = ({ t, xp, setXp }) => {
           {/* BUDGET */}
           <button 
             disabled={shares.budget === todayDate}
-            onClick={() => handleShare('budget', 50, 'Grindup Finances', isFr ? "Mon budget est calculé au millimètre sur Grindup.pro 💸" : "My budget is dialed in on Grindup.pro 💸")} 
+            onClick={() => handleShare('budget', 10, 'Grindup Finances', isFr ? "Mon budget est calculé au millimètre sur Grindup.pro 💸" : "My budget is dialed in on Grindup.pro 💸")} 
             className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-slate-500 transition-colors text-left group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
