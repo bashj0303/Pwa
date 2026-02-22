@@ -18,10 +18,21 @@ const DB = {
   'avocat': { k: 160, p: 2, c: 9, f: 15, u: '100g' },
 };
 
+'huile': { k: 90, p: 0, c: 0, f: 10, u: '1 c.à.s' },
+  'avocat': { k: 160, p: 2, c: 9, f: 15, u: '100g' },
+};
+
+// ==========================================
 // ==========================================
 // TA CLÉ API
 // ==========================================
-const GEMINI_API_KEY = 'AIzaSyCkvn67Uhrw8SquI4uLkRF8zboTL9B2BvA';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+const BAD_FOODS = {
+  'nutella': 'du beurre d\'amande ou d\'arachide avec du cacao pur',
+  'mcdo': 'un burger maison avec steak haché 5% MG',
+  'pizza': 'un wrap pizza protéiné ou une pâte au chou-fleur'
+};
 
 const BAD_FOODS = {
   'nutella': 'du beurre d\'amande ou d\'arachide avec du cacao pur',
