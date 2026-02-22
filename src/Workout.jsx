@@ -12,11 +12,10 @@ const Workout = ({ t }) => {
     saved: isFr ? 'SAUVEGARDÉ!' : 'SAVED!',
     
     statsTitle: isFr ? 'Mensurations & Énergie' : 'Body Stats & Energy',
-    weight: isFr ? 'Poids (Lbs)' : 'Weight (Lbs)',
+    weight: isFr ? 'Poids' : 'Weight', // Enlevé le (Lbs) pour le rendre dynamique
     waist: isFr ? 'Taille (cm)' : 'Waist (cm)',
     energy: isFr ? 'Énergie (1-10)' : 'Energy (1-10)',
 
-    lbs: 'Lbs',
     reps: 'Reps',
     addExercise: isFr ? 'Ajouter' : 'Add',
     promptName: isFr ? 'Nom de l\'exercice ?' : 'Exercise name?',
@@ -36,10 +35,10 @@ const Workout = ({ t }) => {
       : [{ id: 0, l: 'Mon' }, { id: 1, l: 'Tue' }, { id: 2, l: 'Wed' }, { id: 3, l: 'Thu' }, { id: 4, l: 'Fri' }, { id: 5, l: 'Sat' }, { id: 6, l: 'Sun' }]
   };
 
-  // --- LES 3 PROGRAMMES PRÉ-BÂTIS (COMPLETS) ---
+  // --- LES 3 PROGRAMMES PRÉ-BÂTIS ---
   const PREBUILT_TEMPLATES = {
     aesthetic: {
-      0: [ // Lundi : Chest & Calves
+      0: [
         { id: '1', name: "Incline DB Press", sets: 4, targetReps: "8-10" },
         { id: '2', name: "Machine Chest Press", sets: 3, targetReps: "8-10" },
         { id: '3', name: "Cable Flyes (High to Low)", sets: 4, targetReps: "12-15" },
@@ -47,7 +46,7 @@ const Workout = ({ t }) => {
         { id: '5', name: "Standing Calf Raises", sets: 4, targetReps: "15-20" },
         { id: '6', name: "Seated Calf Raises", sets: 4, targetReps: "15-20" }
       ],
-      1: [ // Mardi : Back & Abs
+      1: [
         { id: '7', name: "Wide Pull-Ups", sets: 4, targetReps: "Failure" },
         { id: '8', name: "Lat Pulldowns", sets: 4, targetReps: "10-12" },
         { id: '9', name: "Seated Cable Row", sets: 4, targetReps: "8-10" },
@@ -55,7 +54,7 @@ const Workout = ({ t }) => {
         { id: '11', name: "Hanging Leg Raises", sets: 4, targetReps: "15" },
         { id: '12', name: "Cable Crunches", sets: 4, targetReps: "15-20" }
       ],
-      2: [ // Mercredi : Legs
+      2: [
         { id: '13', name: "Barbell Squat", sets: 4, targetReps: "6-8" },
         { id: '14', name: "Leg Press", sets: 4, targetReps: "10-12" },
         { id: '15', name: "Walking Lunges", sets: 3, targetReps: "12/leg" },
@@ -63,14 +62,14 @@ const Workout = ({ t }) => {
         { id: '17', name: "Lying Leg Curl", sets: 4, targetReps: "15" },
         { id: '18', name: "Stiff-Leg Deadlift", sets: 3, targetReps: "10-12" }
       ],
-      3: [ // Jeudi : Shoulders & Traps
+      3: [
         { id: '19', name: "Seated Military Press", sets: 4, targetReps: "8-10" },
         { id: '20', name: "DB Lateral Raises", sets: 5, targetReps: "12-15" },
         { id: '21', name: "Reverse Pec Deck", sets: 4, targetReps: "12-15" },
         { id: '22', name: "Cable Lateral Raises", sets: 3, targetReps: "15" },
         { id: '23', name: "DB Shrugs", sets: 4, targetReps: "15" }
       ],
-      4: [ // Vendredi : Arms & Core
+      4: [
         { id: '24', name: "Barbell Bicep Curls", sets: 4, targetReps: "8-10" },
         { id: '25', name: "Skull Crushers", sets: 4, targetReps: "8-10" },
         { id: '26', name: "Hammer Curls", sets: 4, targetReps: "10-12" },
@@ -78,37 +77,36 @@ const Workout = ({ t }) => {
         { id: '28', name: "Concentration Curls", sets: 3, targetReps: "15" },
         { id: '29', name: "Plank", sets: 3, targetReps: "60s" }
       ],
-      5: [], // Samedi : Repos
-      6: []  // Dimanche : Repos
+      5: [], 6: []
     },
     athletic: {
-      0: [ // Lundi : Heavy Lower
+      0: [
         { id: '1', name: "Back Squat", sets: 5, targetReps: "5" },
         { id: '2', name: "Bulgarian Split Squats", sets: 3, targetReps: "10/leg" },
         { id: '3', name: "Romanian Deadlift", sets: 4, targetReps: "8" },
         { id: '4', name: "Box Jumps", sets: 3, targetReps: "5" },
         { id: '5', name: "Hanging Leg Raises", sets: 4, targetReps: "15" }
       ],
-      1: [ // Mardi : Upper Strength
+      1: [
         { id: '6', name: "Strict Overhead Press", sets: 4, targetReps: "6-8" },
         { id: '7', name: "Weighted Pull-Ups", sets: 4, targetReps: "6-8" },
         { id: '8', name: "DB Bench Press", sets: 3, targetReps: "10" },
         { id: '9', name: "Pendlay Rows", sets: 4, targetReps: "8" },
         { id: '10', name: "Farmer's Carry", sets: 3, targetReps: "40m" }
       ],
-      2: [ // Mercredi : Conditioning
+      2: [
         { id: '11', name: "Row Ergometer (Sprint)", sets: 5, targetReps: "500m" },
         { id: '12', name: "Kettlebell Swings", sets: 4, targetReps: "20" },
         { id: '13', name: "Wall Balls", sets: 3, targetReps: "20" },
         { id: '14', name: "Burpees", sets: 3, targetReps: "15" }
       ],
-      3: [ // Jeudi : Heavy Posterior
+      3: [
         { id: '15', name: "Deadlift", sets: 4, targetReps: "5" },
         { id: '16', name: "Front Squat", sets: 3, targetReps: "8" },
         { id: '17', name: "Barbell Hip Thrusts", sets: 4, targetReps: "10" },
         { id: '18', name: "Sled Push", sets: 4, targetReps: "20m" }
       ],
-      4: [ // Vendredi : Upper Hypertrophy
+      4: [
         { id: '19', name: "Incline Bench Press", sets: 4, targetReps: "10" },
         { id: '20', name: "Barbell Rows", sets: 4, targetReps: "10" },
         { id: '21', name: "Dips", sets: 3, targetReps: "Max" },
@@ -118,35 +116,35 @@ const Workout = ({ t }) => {
       5: [], 6: []
     },
     bikini: {
-      0: [ // Lundi : Glutes & Hammies
+      0: [
         { id: '1', name: "Barbell Hip Thrusts", sets: 4, targetReps: "10-12" },
         { id: '2', name: "Romanian Deadlifts (RDL)", sets: 4, targetReps: "10" },
         { id: '3', name: "Cable Kickbacks", sets: 3, targetReps: "15/leg" },
         { id: '4', name: "Lying Hamstring Curls", sets: 4, targetReps: "12" },
         { id: '5', name: "Seated Abductions", sets: 3, targetReps: "20" }
       ],
-      1: [ // Mardi : Upper Body & Core
+      1: [
         { id: '6', name: "DB Shoulder Press", sets: 3, targetReps: "12" },
         { id: '7', name: "Lat Pulldowns", sets: 3, targetReps: "12" },
         { id: '8', name: "Lateral Raises", sets: 4, targetReps: "15" },
         { id: '9', name: "Tricep Cable Extensions", sets: 3, targetReps: "15" },
         { id: '10', name: "Deadbugs", sets: 3, targetReps: "20" }
       ],
-      2: [], // Mercredi : Repos
-      3: [ // Jeudi : Glutes Isolation
+      2: [], 
+      3: [
         { id: '11', name: "Kas Glute Bridges", sets: 4, targetReps: "12" },
         { id: '12', name: "Bulgarian Split Squats", sets: 3, targetReps: "10/leg" },
         { id: '13', name: "Deficit Reverse Lunges", sets: 3, targetReps: "12/leg" },
         { id: '14', name: "Cable Pull-Throughs", sets: 4, targetReps: "15" },
         { id: '15', name: "Hip Abductor Machine", sets: 4, targetReps: "15-20" }
       ],
-      4: [ // Vendredi : Quads & Calves
+      4: [
         { id: '16', name: "Goblet Squats", sets: 4, targetReps: "10" },
         { id: '17', name: "Leg Press (Feet low)", sets: 4, targetReps: "12" },
         { id: '18', name: "Leg Extensions", sets: 4, targetReps: "15" },
         { id: '19', name: "Calf Raises", sets: 4, targetReps: "20" }
       ],
-      5: [ // Samedi : Core & Cardio
+      5: [
         { id: '20', name: "Plank", sets: 3, targetReps: "60s" },
         { id: '21', name: "Russian Twists", sets: 3, targetReps: "20" },
         { id: '22', name: "Stairmaster", sets: 1, targetReps: "20 mins" }
@@ -165,7 +163,9 @@ const Workout = ({ t }) => {
   const [showSaved, setShowSaved] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  // V4 : On force le rechargement des programmes complets
+  // NOUVEAU : Unité de poids globale
+  const [weightUnit, setWeightUnit] = useState(() => localStorage.getItem('pos_workout_unit') || 'lbs');
+
   const [routine, setRoutine] = useState(() => {
     const saved = localStorage.getItem('pos_routine_v4');
     return saved ? JSON.parse(saved) : PREBUILT_TEMPLATES.aesthetic;
@@ -182,6 +182,7 @@ const Workout = ({ t }) => {
   });
 
   // --- SAUVEGARDES AUTO ---
+  useEffect(() => localStorage.setItem('pos_workout_unit', weightUnit), [weightUnit]);
   useEffect(() => localStorage.setItem('pos_routine_v4', JSON.stringify(routine)), [routine]);
   useEffect(() => localStorage.setItem('pos_workout_logs_v4', JSON.stringify(logs)), [logs]);
   useEffect(() => localStorage.setItem('pos_body_stats_v4', JSON.stringify(stats)), [stats]);
@@ -194,7 +195,7 @@ const Workout = ({ t }) => {
       return { 
         id: ex.id, 
         name: ex.name, 
-        weight: exLog.lbs || 0, 
+        weight: `${exLog.lbs || 0}${weightUnit}`, // Sauvegarde le chiffre AVEC l'unité (ex: 225lbs ou 100kg)
         reps: `${ex.sets}x${exLog.reps || ex.targetReps}` 
       };
     });
@@ -247,7 +248,7 @@ const Workout = ({ t }) => {
       setRoutine(PREBUILT_TEMPLATES[templateKey]);
       setLogs({});
       setShowTemplates(false);
-      setActiveDay(0); // Ramène au Lundi
+      setActiveDay(0);
     }
   };
 
@@ -304,11 +305,19 @@ const Workout = ({ t }) => {
         )}
       </div>
 
-      {/* TRACKER MENSURATIONS COMPACT */}
+      {/* TRACKER MENSURATIONS COMPACT (Avec bouton LBS/KG) */}
       <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-3 shadow-sm relative z-10">
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center">
-            <label className="text-[8px] text-slate-400 font-bold mb-0.5 uppercase tracking-widest">{vocab.weight}</label>
+            <div className="flex items-center gap-1 mb-0.5">
+              <label className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{vocab.weight}</label>
+              <button 
+                onClick={() => setWeightUnit(weightUnit === 'lbs' ? 'kg' : 'lbs')} 
+                className="text-[7px] bg-slate-800 hover:bg-slate-700 px-1 py-0.5 rounded text-[#ccff00] font-black transition-colors"
+              >
+                {weightUnit.toUpperCase()}
+              </button>
+            </div>
             <input type="number" value={stats.weight} onChange={e => setStats({...stats, weight: e.target.value})} placeholder="-" className="w-full bg-transparent text-white text-center text-[16px] font-black focus:outline-none placeholder-slate-700" />
           </div>
           <div className="bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center">
@@ -367,9 +376,9 @@ const Workout = ({ t }) => {
                 {/* Inputs & Actions */}
                 <div className="flex items-center gap-2 shrink-0">
                   
-                  {/* Case Poids */}
+                  {/* Case Poids (S'ajuste selon LBS ou KG) */}
                   <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">{vocab.lbs}</span>
+                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">{weightUnit}</span>
                     <input 
                       type="number" 
                       value={log.lbs}
