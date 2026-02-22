@@ -39,7 +39,7 @@ const Nutrition = ({ t }) => {
     setupTitle: isFr ? 'Configuration Diète' : 'Diet Setup', btnGuided: isFr ? 'Calculateur Macros' : 'Macro Calculator',
     btnManual: isFr ? 'Entrée Manuelle' : 'Manual Entry',
     aiCoachTitle: isFr ? 'Dis-moi ce que tu as mangé :' : 'Tell me what you ate:',
-    aiCoachPlaceholder: isFr ? 'ex: 3 oeufs brouillés...' : 'e.g. 3 scrambled eggs...',
+    aiCoachPlaceholder: isFr ? 'ex: 2 cuillères de nutella et 40g de fromage...' : 'e.g. 3 scrambled eggs...',
     aiBtnScan: isFr ? 'Scanner le repas' : 'Scan Meal'
   };
 
@@ -71,29 +71,28 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // IA GEMINI - ALIAS UNIVERSEL "gemini-pro"
+  // IA GEMINI - RETOUR AU MODÈLE QUI MARCHAIT (FLASH) + SÉCURITÉ
   // ==========================================
   const handleAIAnalyze = async () => {
     if (!aiInput.trim()) return;
     setIsAiLoading(true);
 
     const promptText = `
-      Agis comme un calculateur de macros nutritionnelles.
-      Repas à analyser : "${aiInput}".
+      Agis comme un calculateur de macros. 
+      Aliment(s) mangé(s) : "${aiInput}".
       
-      INSTRUCTION STRICTE : 
-      Retourne UNIQUEMENT un objet JSON valide. Ne dis pas "Voici les macros" ou "Bonjour". 
-      Format requis :
-      {"name": "Nom du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
+      Retourne UNIQUEMENT un objet JSON. 
+      Format exact : {"name": "Nom du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
     `;
 
     try {
-      // CHANGEMENT MAJEUR : Utilisation de l'alias universel "gemini-pro"
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+      // ON REMET gemini-1.5-flash ET ON LUI FORCE LE FORMAT JSON
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: { responseMimeType: "application/json" }
         })
       });
 
@@ -104,17 +103,6 @@ const Nutrition = ({ t }) => {
       }
 
       let rawText = data.candidates[0].content.parts[0].text;
-      
-      // Extracteur blindé
-      const startIndex = rawText.indexOf('{');
-      const endIndex = rawText.lastIndexOf('}');
-      
-      if (startIndex !== -1 && endIndex !== -1) {
-        rawText = rawText.substring(startIndex, endIndex + 1);
-      } else {
-        throw new Error("L'IA n'a pas retourné de format valide.");
-      }
-
       const parsedData = JSON.parse(rawText);
 
       const newFood = {
@@ -136,8 +124,8 @@ const Nutrition = ({ t }) => {
       setShowAIPanel(false);
 
     } catch (error) {
-      console.error("Erreur Gemini:", error);
-      alert("🚨 ERREUR GOOGLE : " + error.message);
+      console.error("Erreur Gemini détaillée:", error);
+      alert("🚨 ERREUR : " + error.message);
     } finally {
       setIsAiLoading(false);
     }
