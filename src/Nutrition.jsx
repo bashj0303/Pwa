@@ -71,43 +71,50 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // IA GEMINI - MODÈLE 1.5 PRO 
+  // IA GEMINI - ALIAS UNIVERSEL "gemini-pro"
   // ==========================================
   const handleAIAnalyze = async () => {
     if (!aiInput.trim()) return;
     setIsAiLoading(true);
 
     const promptText = `
-      Tu es un expert en nutrition. L'utilisateur a mangé : "${aiInput}".
-      Estime les macros. 
-      Règles strictes :
-      - Retourne UNIQUEMENT un objet JSON.
-      - Utilise exactement ces clés : "name" (nom court du plat), "k" (calories totales), "p" (protéines totales en g), "c" (glucides totaux en g), "f" (lipides totaux en g).
-      Exemple : {"name": "Nutella & Fromage", "k": 350, "p": 15, "c": 30, "f": 20}
+      Agis comme un calculateur de macros nutritionnelles.
+      Repas à analyser : "${aiInput}".
+      
+      INSTRUCTION STRICTE : 
+      Retourne UNIQUEMENT un objet JSON valide. Ne dis pas "Voici les macros" ou "Bonjour". 
+      Format requis :
+      {"name": "Nom du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
     `;
 
     try {
-      // CHANGEMENT ICI : gemini-1.5-pro au lieu de gemini-1.5-flash
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
+      // CHANGEMENT MAJEUR : Utilisation de l'alias universel "gemini-pro"
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: { responseMimeType: "application/json" }
+          contents: [{ parts: [{ text: promptText }] }]
         })
       });
 
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error?.message || "Erreur inconnue de l'API Google");
+        throw new Error(data.error?.message || "Erreur API Google");
       }
 
-      if (!data.candidates || !data.candidates[0].content) {
-        throw new Error("Google a bloqué la réponse.");
+      let rawText = data.candidates[0].content.parts[0].text;
+      
+      // Extracteur blindé
+      const startIndex = rawText.indexOf('{');
+      const endIndex = rawText.lastIndexOf('}');
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        rawText = rawText.substring(startIndex, endIndex + 1);
+      } else {
+        throw new Error("L'IA n'a pas retourné de format valide.");
       }
 
-      const rawText = data.candidates[0].content.parts[0].text;
       const parsedData = JSON.parse(rawText);
 
       const newFood = {
