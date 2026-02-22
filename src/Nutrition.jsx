@@ -20,18 +20,32 @@ const DB = {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const Nutrition = ({ t }) => {
-  // Détection dynamique de la langue
-  const isFr = useMemo(() => t.month === 'mois', [t]);
+const BAD_FOODS = {
+  'nutella': { fr: "du beurre d'amande ou d'arachide avec du cacao pur", en: "almond butter or peanut butter with pure cocoa" },
+  'mcdo': { fr: "un burger maison avec steak haché 5% MG", en: "a homemade burger with 5% fat minced beef" },
+  'pizza': { fr: "un wrap pizza protéiné ou une pâte au chou-fleur", en: "a protein pizza wrap or cauliflower crust" }
+};
 
-  // Vocabulaire synchronisé avec l'état de traduction
+const Nutrition = ({ t }) => {
+  // === DÉTECTEUR DE LANGUE INFAILLIBLE ===
+  const isFr = useMemo(() => {
+    if (!t) return true;
+    const str = JSON.stringify(t).toLowerCase();
+    // Si l'app envoie des mots typiquement français, on est en FR. Sinon, on bascule en Anglais.
+    if (str.includes('entraînement') || str.includes('diète') || str.includes('paramètres') || str.includes('accueil') || str.includes('jour')) {
+      return true;
+    }
+    return false;
+  }, [t]);
+
+  // === VOCABULAIRE SYNCHRONISÉ ===
   const vocab = useMemo(() => ({
     title: isFr ? 'Diète' : 'Diet',
     clearAll: isFr ? 'Effacer la journée ?' : 'Clear today?',
     setGoalsTitle: isFr ? 'Ajuster mes objectifs' : 'Adjust goals',
     namePlaceholder: isFr ? 'Ex: Riz' : 'Ex: Rice',
     qtyPlaceholder: isFr ? 'Qté' : 'Qty',
-    emptyState: isFr ? 'Aucun repas ce jour-là.' : 'No meals today.',
+    emptyState: isFr ? 'Aucun repas ce jour-là. Ajoute ton premier plat.' : 'No meals for this day. Add a dish.',
     days: isFr ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     setupTitle: isFr ? 'Configuration Diète' : 'Diet Setup',
     btnGuided: isFr ? 'Calculateur Macros' : 'Macro Calculator',
@@ -46,13 +60,13 @@ const Nutrition = ({ t }) => {
     calories: isFr ? 'Calories' : 'Calories',
     protein: isFr ? 'Protéines (g)' : 'Protein (g)',
     carbs: isFr ? 'Glucides (g)' : 'Carbs (g)',
-    fat: isFr ? 'Lipides (g)' : 'Fat (g)',
+    fat: isFr ? 'Lipides (g)' : 'Fat (g)'
   }), [isFr]);
 
   const getTodayIndex = () => { let day = new Date().getDay(); return day === 0 ? 6 : day - 1; };
   
   const [setupState, setSetupState] = useState(() => localStorage.getItem('pos_nutri_setup') || 'none');
-  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_goals')) || { calories: 2000, protein: 150, carbs: 200, fat: 60 });
+  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_goals')) || null);
   const [activeDay, setActiveDay] = useState(getTodayIndex());
   const [weeklyFoods, setWeeklyFoods] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_weekly_v4')) || { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] });
   const [showSettings, setShowSettings] = useState(false);
@@ -67,7 +81,7 @@ const Nutrition = ({ t }) => {
   const fileInputRef = useRef(null);
 
   useEffect(() => localStorage.setItem('pos_nutri_weekly_v4', JSON.stringify(weeklyFoods)), [weeklyFoods]);
-  useEffect(() => localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)), [goals]);
+  useEffect(() => { if (goals) localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)); }, [goals]);
   useEffect(() => localStorage.setItem('pos_nutri_setup', setupState), [setupState]);
 
   useEffect(() => {
@@ -104,8 +118,8 @@ const Nutrition = ({ t }) => {
       const modelsData = await modelsRes.json();
       const validModel = modelsData.models.find(m => m.name.includes('1.5-flash')) || modelsData.models[0];
 
-      let promptText = `Analyze this food: "${aiInput}". Return ONLY JSON: {"name": "Food Name", "k": calories, "p": protein, "c": carbs, "f": fat}.`;
-      if (isFr) promptText = `Analyse cet aliment: "${aiInput}". Retourne UNIQUEMENT du JSON: {"name": "Nom", "k": calories, "p": proteines, "c": glucides, "f": lipides}.`;
+      let promptText = `Act as a nutrition expert. Analyze this: "${aiInput}". Estimate macros. Return ONLY JSON: {"name": "Food Name", "k": calories, "p": protein, "c": carbs, "f": fat}. Use English for name.`;
+      if (isFr) promptText = `Agis en expert nutrition. Analyse ceci: "${aiInput}". Estime les macros. Retourne UNIQUEMENT du JSON: {"name": "Nom", "k": calories, "p": proteines, "c": glucides, "f": lipides}. Utilise le Français pour le nom.`;
 
       const promptParts = [{ text: promptText }];
       if (imageBase64) promptParts.push({ inlineData: { mimeType: "image/jpeg", data: imageBase64 } });
@@ -257,7 +271,7 @@ const Nutrition = ({ t }) => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {[ { l: 'Kcal', v: form.k, k: 'k', c: 'text-orange-500 border-orange-500/30' }, { l: 'Pro', v: form.p, k: 'p', c: 'text-blue-500 border-blue-500/30' }, { l: 'Glu', v: form.c, k: 'c', c: 'text-amber-500 border-amber-500/30' }, { l: 'Lip', v: form.f, k: 'f', c: 'text-purple-500 border-purple-500/30' } ].map((f, i) => (
+                  {[ { l: 'Kcal', v: form.k, k: 'k', c: 'text-orange-500 border-orange-500/30' }, { l: isFr ? 'Pro' : 'Pro', v: form.p, k: 'p', c: 'text-blue-500 border-blue-500/30' }, { l: isFr ? 'Glu' : 'Carb', v: form.c, k: 'c', c: 'text-amber-500 border-amber-500/30' }, { l: isFr ? 'Lip' : 'Fat', v: form.f, k: 'f', c: 'text-purple-500 border-purple-500/30' } ].map((f, i) => (
                     <div key={i} className="flex-1 relative mt-2">
                       <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#0f172a] px-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider">{f.l}</span>
                       <input type="number" placeholder="-" value={f.v === 0 ? '' : f.v} onChange={e => setForm({...form, [f.k]: e.target.value})} className={`w-full py-2 bg-slate-900 border rounded-xl text-center text-[16px] font-black outline-none ${f.c}`} />
