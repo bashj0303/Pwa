@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share } from 'lucide-react';
+import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share, Zap } from 'lucide-react';
 
 import Dashboard from './Dashboard';
 import Budget from './Budget';
@@ -14,10 +14,14 @@ const App = () => {
     return saved ? JSON.parse(saved) : defaultValue;
   };
 
-  const [lang, setLang] = useState(() => loadState('pos_lang', 'en'));
+  // NOUVEAU : La langue commence à "null" si c'est la première fois
+  const [lang, setLang] = useState(() => loadState('pos_lang', null));
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('pos_lang', JSON.stringify(lang));
+    if (lang) {
+      localStorage.setItem('pos_lang', JSON.stringify(lang));
+    }
   }, [lang]);
 
   const translations = {
@@ -30,6 +34,7 @@ const App = () => {
       tabReward: 'Rewards',
       tabNutrition: 'Diet',
       goPremium: 'Go Premium',
+      welcome: 'Welcome to the Grind.',
       premiumDesc: 'Unlock cloud sync, advanced protocols and data export.',
       subscribe: 'Subscribe',
       cancel: 'Cancel',
@@ -40,8 +45,6 @@ const App = () => {
       installIOS: 'To install on iPhone:',
       step1: '1. Tap the Share icon below',
       step2: '2. Select "Add to Home Screen"',
-      budgetLeft: 'Remaining',
-      biohacking: 'Biohacking & Habits'
     },
     fr: {
       appTitle: 'Grindup.pro',
@@ -51,6 +54,7 @@ const App = () => {
       tabLab: 'Labo',
       tabReward: 'Rewards',
       tabNutrition: 'Diète',
+      welcome: 'Bienvenue dans le Grind.',
       goPremium: 'Passez Premium',
       premiumDesc: 'Débloquez la synchro cloud, les protocoles avancés et l\'export.',
       subscribe: 'S\'abonner',
@@ -62,79 +66,85 @@ const App = () => {
       installIOS: 'Pour installer sur iPhone :',
       step1: '1. Touchez l\'icône Partager en bas',
       step2: '2. Choisissez "Sur l\'écran d\'accueil"',
-      budgetLeft: 'Restant',
-      biohacking: 'Biohacking & Habitudes'
     }
   };
+
+  const handleLanguageSelect = (selectedLang) => {
+    setLang(selectedLang);
+    setShowWelcome(true);
+    setTimeout(() => {
+      setShowWelcome(false);
+    }, 2000);
+  };
+
+  // --- ÉCRAN DE SÉLECTION DE LANGUE INITIAL ---
+  if (!lang) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-6 selection:bg-[#ccff00] selection:text-black">
+        <Zap size={60} className="text-[#ccff00] mb-8 animate-pulse" />
+        <h1 className="text-3xl font-black text-white mb-2">GRINDUP<span className="text-[#ccff00]">.PRO</span></h1>
+        <p className="text-slate-400 mb-10 text-sm">Choose your interface language</p>
+        
+        <div className="w-full max-w-xs space-y-4">
+          <button onClick={() => handleLanguageSelect('en')} className="w-full bg-slate-800 border border-slate-700 hover:border-[#ccff00] text-white font-black py-4 rounded-2xl transition-all">
+            ENGLISH
+          </button>
+          <button onClick={() => handleLanguageSelect('fr')} className="w-full bg-slate-800 border border-slate-700 hover:border-[#ccff00] text-white font-black py-4 rounded-2xl transition-all">
+            FRANÇAIS
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- ÉCRAN DE BIENVENUE RAPIDE ---
+  if (showWelcome) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center animate-in fade-in zoom-in duration-500">
+        <h2 className="text-2xl font-black text-[#ccff00] uppercase tracking-widest">
+          {translations[lang].welcome}
+        </h2>
+      </div>
+    );
+  }
 
   const t = translations[lang];
   const toggleLanguage = () => setLang(lang === 'en' ? 'fr' : 'en');
 
+  // ... (Le reste du code App.jsx classique pour l'installation, états, etc.)
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isIOS, setIsIOS] = useState(false);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(() => {
-    return localStorage.getItem('pos_hide_prompt') !== 'true';
-  });
+  const [showInstallPrompt, setShowInstallPrompt] = useState(() => localStorage.getItem('pos_hide_prompt') !== 'true');
 
   useEffect(() => {
     if (localStorage.getItem('pos_hide_prompt') === 'true') return;
-
     const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) {
-      setShowInstallPrompt(false);
-      localStorage.setItem('pos_hide_prompt', 'true');
-      return;
-    }
-
+    if (isStandalone) { setShowInstallPrompt(false); localStorage.setItem('pos_hide_prompt', 'true'); return; }
     const ua = window.navigator.userAgent;
     const isIOSDevice = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i) || (!!ua.match(/Macintosh/i) && 'ontouchend' in document);
-    
-    if (isIOSDevice) {
-      setIsIOS(true);
-      setShowInstallPrompt(true);
-    }
-
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallPrompt(true);
-    };
-
+    if (isIOSDevice) { setIsIOS(true); setShowInstallPrompt(true); }
+    const handleBeforeInstallPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); setShowInstallPrompt(true); };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  const dismissPrompt = () => {
-    setShowInstallPrompt(false);
-    localStorage.setItem('pos_hide_prompt', 'true');
-  };
-
+  const dismissPrompt = () => { setShowInstallPrompt(false); localStorage.setItem('pos_hide_prompt', 'true'); };
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        dismissPrompt();
-      }
+      if (outcome === 'accepted') dismissPrompt();
       setDeferredPrompt(null);
     }
   };
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPremium, setShowPremium] = useState(false);
-  
-  // LE CORRECTIF EST ICI (pos_xp_v2 pour écraser le 140 et le mettre à 0)
   const [xp, setXp] = useState(() => loadState('pos_xp_v2', 0));
-
   const [expenses] = useState(() => loadState('pos_budget_v5_m' + new Date().getMonth(), { fixed: [], variables: [], autoTransfers: [], incomeBase: 0, incomeTS: 0 }));
   const [payFreq] = useState(() => loadState('pos_pay_freq_v5', 2));
   
-  const totalIncome = Number(expenses.incomeBase) + Number(expenses.incomeTS);
-  const autoTransferPerPay = expenses.autoTransfers ? expenses.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0) : 0;
-  const totalAutoTransferMonthly = autoTransferPerPay * payFreq;
-  const totalFixed = expenses.fixed ? expenses.fixed.reduce((sum, item) => sum + Number(item.amount), 0) : 0;
-  const totalVariablesSpent = expenses.variables ? expenses.variables.reduce((sum, item) => sum + Number(item.spent), 0) : 0;
-  const balance = totalIncome - (totalAutoTransferMonthly + totalFixed + totalVariablesSpent);
+  const balance = (Number(expenses.incomeBase) + Number(expenses.incomeTS)) - ((expenses.autoTransfers ? expenses.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0) : 0) * payFreq + (expenses.fixed ? expenses.fixed.reduce((sum, item) => sum + Number(item.amount), 0) : 0) + (expenses.variables ? expenses.variables.reduce((sum, item) => sum + Number(item.spent), 0) : 0));
   
   const [protocols, setProtocols] = useState(() => loadState('pos_protocols', [
     { id: 1, name: 'CJC 100mcg / IPA 100mcg (AM)', done: false },
@@ -168,12 +178,8 @@ const App = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button 
-              onClick={toggleLanguage}
-              className="px-3 py-2.5 bg-slate-800 rounded-xl border border-slate-700 text-white font-bold text-xs flex items-center gap-2 hover:bg-slate-700 transition-colors"
-            >
-              <Globe size={16} />
-              {lang === 'en' ? 'FR' : 'EN'}
+            <button onClick={toggleLanguage} className="px-3 py-2.5 bg-slate-800 rounded-xl border border-slate-700 text-white font-bold text-xs flex items-center gap-2 hover:bg-slate-700 transition-colors">
+              <Globe size={16} /> {lang === 'en' ? 'FR' : 'EN'}
             </button>
             <button onClick={() => setShowPremium(true)} className="p-2.5 bg-slate-800 rounded-xl border border-slate-700 text-[#ccff00] hover:bg-slate-700 transition-colors">
               <Crown size={20} />
@@ -203,15 +209,9 @@ const App = () => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
               return (
-                <button 
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center gap-1.5 w-12 transition-all duration-300 ${isActive ? 'text-[#ccff00] -translate-y-1' : 'text-slate-500 hover:text-slate-400'}`}
-                >
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1.5 w-12 transition-all duration-300 ${isActive ? 'text-[#ccff00] -translate-y-1' : 'text-slate-500 hover:text-slate-400'}`}>
                   <Icon size={isActive ? 20 : 18} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className={`text-[7px] font-bold uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-70'}`}>
-                    {tab.label}
-                  </span>
+                  <span className={`text-[7px] font-bold uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-70'}`}>{tab.label}</span>
                   {isActive && <div className="w-1 h-1 bg-[#ccff00] rounded-full mt-0.5 shadow-[0_0_8px_#ccff00]" />}
                 </button>
               );
