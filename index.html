@@ -1,16 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Grindup.pro</title>
+    
+    <link rel="apple-touch-icon" href="/logo.png" />
     
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0f172a" />
-    <link rel="apple-touch-icon" href="/icon-192x192.png" />
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Empêche le rebond du scroll sur iPhone pour que ça ressemble à une vraie App */
+      body {
+        overscroll-behavior-y: contain;
+        background-color: #0f172a;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
