@@ -291,11 +291,12 @@ const Nutrition = ({ t }) => {
                 ) : null}
 
                 <div className="flex gap-2 mb-2">
+                  {/* C'est ICI que j'ai changé text-sm pour text-[16px] pour tuer le zoom de l'iPhone ! */}
                   <textarea 
                     value={aiInput} 
                     onChange={(e) => setAiInput(e.target.value)} 
                     placeholder={vocab.aiCoachPlaceholder} 
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none resize-none h-14" 
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-[16px] text-white focus:border-blue-500 outline-none resize-none h-14" 
                   />
                   
                   <div className="flex items-center justify-center">
@@ -367,7 +368,7 @@ const Nutrition = ({ t }) => {
                     type="number" 
                     value={goals[item.key]} 
                     onChange={(e) => setGoals({...goals, [item.key]: Number(e.target.value)})} 
-                    className="w-24 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-black text-center outline-none focus:border-[#ccff00] transition-colors"
+                    className="w-24 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[16px] text-white font-black text-center outline-none focus:border-[#ccff00] transition-colors"
                   />
                 </div>
               ))}
@@ -380,8 +381,6 @@ const Nutrition = ({ t }) => {
           </div>
         </div>
       )}
-      {/* ---------------------------------------- */}
-
     </div>
   );
 };
