@@ -46,12 +46,10 @@ const Nutrition = ({ t }) => {
     emptyState: isFr ? 'Aucun repas ce jour-là. Ajoute ton premier plat.' : 'No meals for this day. Add a dish.',
     days: isFr ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     
-    // Onboarding
     setupTitle: isFr ? 'Configuration Diète' : 'Diet Setup',
     btnGuided: isFr ? 'Calculateur Macros' : 'Macro Calculator',
     btnManual: isFr ? 'Entrée Manuelle' : 'Manual Entry',
     
-    // IA Coach
     aiCoachTitle: isFr ? 'Dis-moi ce que tu as mangé :' : 'Tell me what you ate:',
     aiCoachPlaceholder: isFr ? 'ex: 3 oeufs brouillés avec 2 tranches de pain complet et un café...' : 'e.g. 3 scrambled eggs with 2 slices of whole wheat toast...',
     aiBtnScan: isFr ? 'Scanner le repas' : 'Scan Meal',
@@ -72,7 +70,6 @@ const Nutrition = ({ t }) => {
   const [form, setForm] = useState({ name: '', qty: '', k: '', p: '', c: '', f: '' });
   const [coachAlert, setCoachAlert] = useState({ active: false, foodName: '', altText: '' });
 
-  // --- ÉTATS POUR L'IA GEMINI ---
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -89,7 +86,7 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // LA MAGIE DE GEMINI (APPEL API)
+  // IA GEMINI - VERSION BLINDÉE (BULLETPROOF PARSER)
   // ==========================================
   const handleAIAnalyze = async () => {
     if (!aiInput.trim()) return;
@@ -97,14 +94,11 @@ const Nutrition = ({ t }) => {
     setIsAiLoading(true);
 
     const promptText = `
-      Tu es l'IA nutritionnelle experte de l'application Grindup.pro.
-      L'utilisateur te dit ce qu'il a mangé : "${aiInput}".
-      
-      Analyse ce repas et estime les macros totaux.
-      Tu DOIS répondre UNIQUEMENT avec un objet JSON valide, sans aucun texte autour, sans markdown (\`\`\`).
-      
-      Format exigé exact :
-      {"name": "Nom court et stylé du repas", "k": total_calories, "p": total_proteines_grammes, "c": total_glucides_grammes, "f": total_lipides_grammes}
+      Tu es une IA nutritionnelle experte. L'utilisateur a mangé : "${aiInput}".
+      Calcule les macros totaux de ce repas.
+      IMPORTANT : Ta réponse doit être UNIQUEMENT un objet JSON. Aucun texte avant, aucun texte après, pas de "Bonjour", pas de markdown.
+      Format exact :
+      {"name": "Description courte (ex: Nutella & Fromage)", "k": 350, "p": 15, "c": 30, "f": 20}
     `;
 
     try {
@@ -120,16 +114,23 @@ const Nutrition = ({ t }) => {
       if (data.error) throw new Error(data.error.message);
 
       let rawText = data.candidates[0].content.parts[0].text;
-      // Nettoyage au cas où Gemini ajoute des symboles
-      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       
+      // FIX ANTI-CRASH : On trouve le premier { et le dernier } pour isoler les maths
+      const startIndex = rawText.indexOf('{');
+      const endIndex = rawText.lastIndexOf('}');
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        rawText = rawText.substring(startIndex, endIndex + 1);
+      } else {
+        throw new Error("L'IA n'a pas retourné de format valide.");
+      }
+
       const parsedData = JSON.parse(rawText);
 
-      // Ajout direct dans la liste du jour !
       const newFood = {
         id: Date.now(),
         time: timeStr,
-        name: parsedData.name + " 🤖", // Emoji robot pour montrer que c'est l'IA
+        name: parsedData.name + " 🤖", // Emoji robot 
         k: Number(parsedData.k) || 0,
         p: Number(parsedData.p) || 0,
         c: Number(parsedData.c) || 0,
@@ -145,8 +146,8 @@ const Nutrition = ({ t }) => {
       setShowAIPanel(false);
 
     } catch (error) {
-      console.error("Erreur Gemini:", error);
-      alert("Erreur avec l'IA. Essaye de reformuler ton repas.");
+      console.error("Erreur Gemini détaillée:", error);
+      alert("Erreur avec l'IA. Essaye de reformuler ton repas de façon plus simple.");
     } finally {
       setIsAiLoading(false);
     }
@@ -290,90 +291,4 @@ const Nutrition = ({ t }) => {
             {vocab.emptyState}
           </div>
         )}
-        {(weeklyFoods[activeDay] || []).map((item) => (
-          <div key={item.id} className="bg-slate-800/60 border border-slate-700/50 p-3 rounded-2xl flex items-center shadow-md">
-            <div className="pr-3 border-r border-slate-700/50 mr-3 text-center"><span className="block text-[10px] font-black text-[#ccff00]">{item.time}</span></div>
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between items-center mb-1"><h3 className="font-bold text-white text-sm truncate">{item.name}</h3><span className="text-xs font-black text-orange-500 whitespace-nowrap">{item.k} kcal</span></div>
-              <div className="flex gap-2">
-                <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">P: {item.p}g</span>
-                <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">G: {item.c}g</span>
-                <span className="text-[9px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">L: {item.f}g</span>
-              </div>
-            </div>
-            <button onClick={() => setWeeklyFoods(p => ({...p, [activeDay]: p[activeDay].filter(f => f.id !== item.id)}))} className="ml-3 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition"><Trash2 size={16} /></button>
-          </div>
-        ))}
-      </div>
-
-      {/* PANNEAU DE SAISIE GLOBAL (IA + MANUEL) */}
-      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-y border-slate-800/80 p-4 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        <div className="w-full space-y-3">
-            
-            {/* BOUTON TOGGLE IA */}
-            <div className="flex justify-center -mt-8 relative z-40">
-              <button 
-                onClick={() => setShowAIPanel(!showAIPanel)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-black text-[10px] tracking-widest shadow-lg transition-transform hover:scale-105 ${showAIPanel ? 'bg-slate-800 text-white border border-slate-700' : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'}`}
-              >
-                <Bot size={16} /> {showAIPanel ? 'Fermer IA' : 'Scanner repas avec IA ✨'}
-              </button>
-            </div>
-
-            {/* PANNEAU IA GEMINI */}
-            {showAIPanel && (
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 animate-in fade-in zoom-in duration-200">
-                <label className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-2 block">{vocab.aiCoachTitle}</label>
-                <textarea 
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  placeholder={vocab.aiCoachPlaceholder}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none resize-none h-20"
-                />
-                <button 
-                  onClick={handleAIAnalyze}
-                  disabled={isAiLoading || !aiInput.trim()}
-                  className="w-full mt-2 bg-blue-500 disabled:bg-slate-700 text-white font-black py-2.5 rounded-lg flex items-center justify-center gap-2"
-                >
-                  {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} 
-                  {isAiLoading ? 'Analyse en cours...' : vocab.aiBtnScan}
-                </button>
-              </div>
-            )}
-
-            {/* PANNEAU MANUEL */}
-            {!showAIPanel && (
-              <>
-                <div className="flex gap-2">
-                  <input type="time" value={timeStr} onChange={e => setTimeStr(e.target.value)} className="w-20 bg-slate-900 border border-slate-700 rounded-xl px-1 text-center text-[16px] font-bold text-[#ccff00] outline-none" />
-                  <input type="text" value={form.name} onChange={e => handleAutoCalc(e.target.value, form.qty)} placeholder={vocab.namePlaceholder} className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[16px] font-bold text-white outline-none focus:border-[#ccff00] placeholder-slate-600" />
-                  <div className="relative w-24">
-                    <input type="number" value={form.qty} onChange={e => handleAutoCalc(form.name, e.target.value)} placeholder="Qté" className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-2 pr-6 py-2 text-[16px] font-bold text-[#ccff00] outline-none focus:border-[#ccff00] placeholder-slate-600" />
-                    <span className="absolute right-2 top-3 text-[10px] font-bold text-slate-500 pointer-events-none">g/u</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {[
-                    { l: 'Kcal', v: form.k, k: 'k', c: 'text-orange-500 border-orange-500/30' },
-                    { l: 'Pro', v: form.p, k: 'p', c: 'text-blue-500 border-blue-500/30' },
-                    { l: 'Glu', v: form.c, k: 'c', c: 'text-amber-500 border-amber-500/30' },
-                    { l: 'Lip', v: form.f, k: 'f', c: 'text-purple-500 border-purple-500/30' },
-                  ].map((f, i) => (
-                    <div key={i} className="flex-1 relative mt-2">
-                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#0f172a] px-1 text-[8px] font-bold text-slate-400 uppercase tracking-wider">{f.l}</span>
-                      <input type="number" placeholder="-" value={f.v === 0 ? '' : f.v} onChange={e => setForm({...form, [f.k]: e.target.value})} className={`w-full py-2 bg-slate-900 border rounded-xl text-center text-[16px] font-black outline-none ${f.c}`} />
-                    </div>
-                  ))}
-                  <button onClick={attemptAddEntry} disabled={!form.name} className="w-12 bg-[#ccff00] disabled:bg-slate-800 disabled:text-slate-600 text-black rounded-xl hover:bg-[#b3e600] transition font-black flex items-center justify-center mt-2">
-                    <Plus size={20} />
-                  </button>
-                </div>
-              </>
-            )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Nutrition;
+        {(weeklyFoods[activeDay] || []
