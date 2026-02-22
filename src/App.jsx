@@ -18,23 +18,48 @@ const App = () => {
     }
   };
 
-  // 1. État Langue (null = 1ère ouverture)
+  // =========================================================================
+  // ⚠️ RÈGLE D'OR : TOUS LES ÉTATS (useState) DOIVENT ÊTRE TOUT EN HAUT !
+  // =========================================================================
   const [lang, setLang] = useState(() => loadState('pos_lang', null));
   const [showWelcome, setShowWelcome] = useState(false);
-  
-  // 2. État Abonnement
   const [hasSubscription, setHasSubscription] = useState(() => loadState('pos_sub_active', false));
+  
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [xp, setXp] = useState(() => loadState('pos_xp_v2', 0));
+  const [expenses] = useState(() => loadState('pos_budget_v5_m' + new Date().getMonth(), { fixed: [], variables: [], autoTransfers: [], incomeBase: 0, incomeTS: 0 }));
+  const [payFreq] = useState(() => loadState('pos_pay_freq_v5', 2));
+  
+  const [protocols, setProtocols] = useState(() => loadState('pos_protocols', [
+    { id: 1, name: 'CJC 100mcg / IPA 100mcg (AM)', done: false },
+    { id: 2, name: 'CJC 100mcg / IPA 100mcg (PM)', done: false },
+    { id: 3, name: 'MOTS-c 1mg', done: false },
+    { id: 4, name: 'Semax', done: false },
+  ]));
 
+  // =========================================================================
+  // SAUVEGARDES AUTOMATIQUES (useEffect)
+  // =========================================================================
   useEffect(() => {
     if (lang) localStorage.setItem('pos_lang', JSON.stringify(lang));
     localStorage.setItem('pos_sub_active', JSON.stringify(hasSubscription));
   }, [lang, hasSubscription]);
 
+  useEffect(() => localStorage.setItem('pos_xp_v2', JSON.stringify(xp)), [xp]);
+  useEffect(() => localStorage.setItem('pos_protocols', JSON.stringify(protocols)), [protocols]);
+
+  // Calcul du budget pour le Dashboard
+  const balance = (Number(expenses.incomeBase) + Number(expenses.incomeTS)) - ((expenses.autoTransfers ? expenses.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0) : 0) * payFreq + (expenses.fixed ? expenses.fixed.reduce((sum, item) => sum + Number(item.amount), 0) : 0) + (expenses.variables ? expenses.variables.reduce((sum, item) => sum + Number(item.spent), 0) : 0));
+
+  // =========================================================================
+  // DICTIONNAIRE DE TRADUCTION
+  // =========================================================================
   const translations = {
     en: {
       appTitle: 'Grindup.pro', tabDashboard: 'Overview', tabBudget: 'Budget', tabWorkout: 'Training',
       tabLab: 'Lab', tabReward: 'Rewards', tabNutrition: 'Diet',
       welcome: 'Welcome to the Grind.',
+      budgetLeft: 'Remaining', biohacking: 'Biohacking & Habits',
       pwTitle: 'UNLOCK YOUR POTENTIAL', pwSubtitle: 'The ultimate Life OS for the dedicated 1%.',
       pwFeature1: 'Smart AI Diet Coach', pwFeature2: 'Aesthetic Workout Tracker',
       pwFeature3: 'Advanced Peptide Lab Protocols', pwFeature4: 'Zero-Stress Financial Budget',
@@ -45,6 +70,7 @@ const App = () => {
       appTitle: 'Grindup.pro', tabDashboard: 'Aperçu', tabBudget: 'Budget', tabWorkout: 'Training',
       tabLab: 'Labo', tabReward: 'Rewards', tabNutrition: 'Diète',
       welcome: 'Bienvenue dans le Grind.',
+      budgetLeft: 'Restant', biohacking: 'Biohacking & Habitudes',
       pwTitle: 'DÉBLOQUE TON POTENTIEL', pwSubtitle: 'Le "Life OS" ultime pour le 1% qui grind.',
       pwFeature1: 'Coach IA Diète Intelligent', pwFeature2: 'Tracker Workout Aesthetic',
       pwFeature3: 'Protocoles Labo Peptides', pwFeature4: 'Budget Financier Zéro-Stress',
@@ -53,9 +79,12 @@ const App = () => {
     }
   };
 
-  // =========================================================
-  // ÉTAPE 1 : CHOIX DE LA LANGUE (Première ouverture)
-  // =========================================================
+  const t = translations[lang] || translations['en'];
+  const toggleLanguage = () => setLang(lang === 'en' ? 'fr' : 'en');
+
+  // =========================================================================
+  // ÉCRAN 1 : CHOIX DE LA LANGUE (Première ouverture)
+  // =========================================================================
   if (!lang) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-6 selection:bg-[#ccff00] selection:text-black">
@@ -70,12 +99,9 @@ const App = () => {
     );
   }
 
-  // On sécurise la variable t une fois la langue choisie
-  const t = translations[lang] || translations['fr'];
-
-  // =========================================================
-  // ÉTAPE 2 : ÉCRAN DE BIENVENUE RAPIDE (2 secondes)
-  // =========================================================
+  // =========================================================================
+  // ÉCRAN 2 : ÉCRAN DE BIENVENUE RAPIDE (2 secondes)
+  // =========================================================================
   if (showWelcome) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex items-center justify-center animate-in fade-in zoom-in duration-500">
@@ -84,11 +110,9 @@ const App = () => {
     );
   }
 
-  const toggleLanguage = () => setLang(lang === 'en' ? 'fr' : 'en');
-
-  // =========================================================
-  // ÉTAPE 3 : LE PAYWALL / ABONNEMENT
-  // =========================================================
+  // =========================================================================
+  // ÉCRAN 3 : LE PAYWALL / ABONNEMENT
+  // =========================================================================
   if (!hasSubscription) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col justify-between selection:bg-[#ccff00] selection:text-black relative overflow-hidden animate-in fade-in duration-500">
@@ -122,7 +146,10 @@ const App = () => {
               <span className="text-slate-500 font-bold text-sm">{t.pwPerMonth}</span>
             </div>
             <p className="text-[10px] text-slate-400 font-bold mb-6 flex items-center justify-center gap-1.5"><ShieldCheck size={14} className="text-emerald-500" />{t.pwCancel}</p>
-            <button onClick={() => setHasSubscription(true)} className="w-full bg-[#ccff00] text-black font-black uppercase tracking-widest py-4 rounded-xl flex justify-center items-center gap-2 hover:scale-[102%] transition-transform shadow-[0_0_20px_rgba(204,255,0,0.2)]">
+            <button 
+              onClick={() => setHasSubscription(true)} 
+              className="w-full bg-[#ccff00] text-black font-black uppercase tracking-widest py-4 rounded-xl flex justify-center items-center gap-2 hover:scale-[102%] transition-transform shadow-[0_0_20px_rgba(204,255,0,0.2)]"
+            >
               <Lock size={18} /> {t.pwBtn}
             </button>
             <button className="mt-5 text-[10px] text-slate-500 font-bold underline hover:text-white transition-colors">{t.pwRestore}</button>
@@ -132,26 +159,9 @@ const App = () => {
     );
   }
 
-  // =========================================================
-  // ÉTAPE 4 : L'APPLICATION PRINCIPALE (Abonné)
-  // =========================================================
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [xp, setXp] = useState(() => loadState('pos_xp_v2', 0));
-  const [expenses] = useState(() => loadState('pos_budget_v5_m' + new Date().getMonth(), { fixed: [], variables: [], autoTransfers: [], incomeBase: 0, incomeTS: 0 }));
-  const [payFreq] = useState(() => loadState('pos_pay_freq_v5', 2));
-  
-  const balance = (Number(expenses.incomeBase) + Number(expenses.incomeTS)) - ((expenses.autoTransfers ? expenses.autoTransfers.reduce((sum, item) => sum + Number(item.amount), 0) : 0) * payFreq + (expenses.fixed ? expenses.fixed.reduce((sum, item) => sum + Number(item.amount), 0) : 0) + (expenses.variables ? expenses.variables.reduce((sum, item) => sum + Number(item.spent), 0) : 0));
-  
-  const [protocols, setProtocols] = useState(() => loadState('pos_protocols', [
-    { id: 1, name: 'CJC 100mcg / IPA 100mcg (AM)', done: false },
-    { id: 2, name: 'CJC 100mcg / IPA 100mcg (PM)', done: false },
-    { id: 3, name: 'MOTS-c 1mg', done: false },
-    { id: 4, name: 'Semax', done: false },
-  ]));
-
-  useEffect(() => localStorage.setItem('pos_xp_v2', JSON.stringify(xp)), [xp]);
-  useEffect(() => localStorage.setItem('pos_protocols', JSON.stringify(protocols)), [protocols]);
-
+  // =========================================================================
+  // ÉCRAN 4 : L'APPLICATION PRINCIPALE (Abonné)
+  // =========================================================================
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-[#ccff00] selection:text-black flex justify-center animate-in fade-in duration-300">
       <div className="w-full max-w-md bg-[#0f172a] min-h-screen relative shadow-2xl flex flex-col border-x border-slate-800/50">
@@ -171,7 +181,7 @@ const App = () => {
               <Globe size={16} /> {lang === 'en' ? 'FR' : 'EN'}
             </button>
             <button 
-              onClick={() => { if(window.confirm(isFr ? "Test: Simuler perte abonnement ?" : "Test: Simulate sub loss?")) setHasSubscription(false); }} 
+              onClick={() => { if(window.confirm(isFr ? "Test: Simuler fin de l'essai gratuit ?" : "Test: Simulate end of free trial?")) setHasSubscription(false); }} 
               className="px-3 py-2.5 bg-slate-800 rounded-xl border border-slate-700 text-slate-500 hover:text-red-400 transition-colors text-[10px] font-bold"
             >
               LOGOUT
