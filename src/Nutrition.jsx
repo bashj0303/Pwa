@@ -29,11 +29,7 @@ const BAD_FOODS = {
   'pizza': 'un wrap pizza protéiné ou une pâte au chou-fleur'
 };
 
-const BAD_FOODS = {
-  'nutella': 'du beurre d\'amande ou d\'arachide avec du cacao pur',
-  'mcdo': 'un burger maison avec steak haché 5% MG',
-  'pizza': 'un wrap pizza protéiné ou une pâte au chou-fleur'
-};
+const Nutrition = ({ t }) => {
 
 const Nutrition = ({ t }) => {
   const isFr = t.month === 'mois';
