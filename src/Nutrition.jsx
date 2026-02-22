@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Flame, RotateCcw, Settings, Target, Zap, ShieldAlert, Bot, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Flame, RotateCcw, Settings, Target, Zap, ShieldAlert, Bot, Loader2, Camera, X } from 'lucide-react';
 
 const DB = {
   'poulet': { k: 165, p: 31, c: 0, f: 3.6, u: '100g' },
@@ -38,8 +38,8 @@ const Nutrition = ({ t }) => {
     days: isFr ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     setupTitle: isFr ? 'Configuration Diète' : 'Diet Setup', btnGuided: isFr ? 'Calculateur Macros' : 'Macro Calculator',
     btnManual: isFr ? 'Entrée Manuelle' : 'Manual Entry',
-    aiCoachTitle: isFr ? 'Dis-moi ce que tu as mangé :' : 'Tell me what you ate:',
-    aiCoachPlaceholder: isFr ? 'ex: 2 cuillères de nutella et 40g de fromage...' : 'e.g. 3 scrambled eggs...',
+    aiCoachTitle: isFr ? 'Photo ou Description :' : 'Photo or Description:',
+    aiCoachPlaceholder: isFr ? 'ex: 2 cuillères de nutella...' : 'e.g. 3 scrambled eggs...',
     aiBtnScan: isFr ? 'Scanner le repas' : 'Scan Meal'
   };
 
@@ -58,6 +58,11 @@ const Nutrition = ({ t }) => {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  // --- NOUVEAUX ÉTATS POUR LA PHOTO ---
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => localStorage.setItem('pos_nutri_weekly_v4', JSON.stringify(weeklyFoods)), [weeklyFoods]);
   useEffect(() => { if (goals) localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)); }, [goals]);
@@ -71,53 +76,88 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // IA GEMINI - LE DÉTECTEUR DE MODÈLE AUTO
+  // TRAITEMENT DE L'IMAGE
+  // ==========================================
+  const handleImageCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Créer un aperçu visuel
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    // Convertir l'image en Base64 pour Gemini
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // On retire le préfixe "data:image/jpeg;base64," pour ne garder que le code pur
+      const base64String = reader.result.split(',')[1];
+      setImageBase64(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    setImageBase64(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ==========================================
+  // IA GEMINI - TEXTE + VISION (PHOTO)
   // ==========================================
   const handleAIAnalyze = async () => {
-    if (!aiInput.trim()) return;
+    if (!aiInput.trim() && !imageBase64) return;
     setIsAiLoading(true);
 
     try {
-      // 1. CHERCHER LE MODÈLE QUI MARCHE
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
       const modelsData = await modelsRes.json();
       
       if (!modelsRes.ok) throw new Error(modelsData.error?.message || "Impossible de lister les modèles.");
 
-      // On trouve le premier modèle "gemini" qui a le droit de générer du contenu
+      // On force la recherche d'un modèle 1.5 (car ils ont tous la Vision)
       const validModelObj = modelsData.models.find(m => 
-        m.name.includes('gemini') && 
+        (m.name.includes('1.5-flash') || m.name.includes('1.5-pro')) && 
         m.supportedGenerationMethods.includes('generateContent')
-      );
+      ) || modelsData.models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods.includes('generateContent'));
 
       if (!validModelObj) throw new Error("Aucun modèle Gemini fonctionnel trouvé sur ce compte.");
+      const exactModelName = validModelObj.name;
 
-      const exactModelName = validModelObj.name; // Ça donnera le bon nom (ex: "models/gemini-1.5-flash-latest")
-      console.log("Modèle trouvé et utilisé :", exactModelName);
+      // Construction du prompt (Texte + Image si présente)
+      let promptParts = [
+        { 
+          text: `Agis comme un expert en nutrition. 
+          ${aiInput ? `Détails supplémentaires : "${aiInput}".` : "Analyse l'image du repas."}
+          Estime les portions et les macros de ce repas.
+          Retourne UNIQUEMENT un objet JSON valide, sans markdown, sans texte autour. 
+          Format exact : {"name": "Nom du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}` 
+        }
+      ];
 
-      // 2. ENVOYER LA REQUÊTE AU BON MODÈLE
-      const promptText = `
-        Agis comme un calculateur de macros nutritionnelles. 
-        Aliment(s) mangé(s) : "${aiInput}".
-        Retourne UNIQUEMENT un objet JSON, sans texte autour. 
-        Format exact : {"name": "Nom court du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
-      `;
+      // Si l'utilisateur a pris une photo, on l'ajoute au "cerveau" de l'IA
+      if (imageBase64) {
+        promptParts.push({
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageBase64
+          }
+        });
+      }
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${exactModelName}:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
+          contents: [{ parts: promptParts }]
         })
       });
 
       const data = await response.json();
-      
       if (!response.ok) throw new Error(data.error?.message || "Erreur lors de l'analyse.");
 
       let rawText = data.candidates[0].content.parts[0].text;
       
-      // Filtre anti-crash
       const startIndex = rawText.indexOf('{');
       const endIndex = rawText.lastIndexOf('}');
       if (startIndex !== -1 && endIndex !== -1) {
@@ -130,7 +170,8 @@ const Nutrition = ({ t }) => {
 
       const newFood = {
         id: Date.now(), time: timeStr,
-        name: parsedData.name + " 🤖", k: Number(parsedData.k) || 0,
+        name: parsedData.name + (imageBase64 ? " 📸" : " 🤖"), 
+        k: Number(parsedData.k) || 0,
         p: Number(parsedData.p) || 0, c: Number(parsedData.c) || 0, f: Number(parsedData.f) || 0
       };
 
@@ -139,11 +180,13 @@ const Nutrition = ({ t }) => {
         [activeDay]: [...prev[activeDay], newFood].sort((a, b) => a.time.localeCompare(b.time)) 
       }));
 
+      // Nettoyage après succès
       setAiInput('');
+      removeImage();
       setShowAIPanel(false);
 
     } catch (error) {
-      console.error("Erreur Gemini détaillée:", error);
+      console.error("Erreur Gemini:", error);
       alert("🚨 ERREUR GOOGLE : " + error.message);
     } finally {
       setIsAiLoading(false);
@@ -241,22 +284,62 @@ const Nutrition = ({ t }) => {
         ))}
       </div>
 
+      {/* PANNEAU DE SAISIE GLOBAL */}
       <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-y border-slate-800/80 p-4 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <div className="w-full space-y-3">
+            
             <div className="flex justify-center -mt-8 relative z-40">
               <button onClick={() => setShowAIPanel(!showAIPanel)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-black text-[10px] tracking-widest shadow-lg transition-transform hover:scale-105 ${showAIPanel ? 'bg-slate-800 text-white border border-slate-700' : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'}`}>
                 <Bot size={16} /> {showAIPanel ? 'Fermer IA' : 'Scanner repas avec IA ✨'}
               </button>
             </div>
+
+            {/* PANNEAU IA (AVEC CAMÉRA) */}
             {showAIPanel && (
               <div className="bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 animate-in fade-in zoom-in duration-200">
                 <label className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-2 block">{vocab.aiCoachTitle}</label>
-                <textarea value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder={vocab.aiCoachPlaceholder} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none resize-none h-20" />
-                <button onClick={handleAIAnalyze} disabled={isAiLoading || !aiInput.trim()} className="w-full mt-2 bg-blue-500 disabled:bg-slate-700 text-white font-black py-2.5 rounded-lg flex items-center justify-center gap-2">
-                  {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} {isAiLoading ? 'Analyse en cours...' : vocab.aiBtnScan}
+                
+                {/* ZONE D'IMAGE */}
+                {imagePreview ? (
+                  <div className="relative mb-3 inline-block">
+                    <img src={imagePreview} alt="Repas" className="h-24 w-24 object-cover rounded-lg border-2 border-[#ccff00]" />
+                    <button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><X size={12} /></button>
+                  </div>
+                ) : null}
+
+                <div className="flex gap-2 mb-2">
+                  <textarea 
+                    value={aiInput} 
+                    onChange={(e) => setAiInput(e.target.value)} 
+                    placeholder={vocab.aiCoachPlaceholder} 
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none resize-none h-14" 
+                  />
+                  
+                  {/* BOUTON CAMÉRA */}
+                  <div className="flex items-center justify-center">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" // Force l'ouverture de la caméra arrière sur mobile
+                      onChange={handleImageCapture} 
+                      ref={fileInputRef}
+                      className="hidden" 
+                      id="camera-upload" 
+                    />
+                    <label htmlFor="camera-upload" className="bg-slate-700 hover:bg-slate-600 cursor-pointer h-14 w-14 rounded-lg flex items-center justify-center text-white transition-colors border border-slate-600">
+                      <Camera size={24} />
+                    </label>
+                  </div>
+                </div>
+
+                <button onClick={handleAIAnalyze} disabled={isAiLoading || (!aiInput.trim() && !imageBase64)} className="w-full bg-blue-500 disabled:bg-slate-700 text-white font-black py-2.5 rounded-lg flex items-center justify-center gap-2">
+                  {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} 
+                  {isAiLoading ? 'Analyse en cours...' : vocab.aiBtnScan}
                 </button>
               </div>
             )}
+
+            {/* PANNEAU MANUEL */}
             {!showAIPanel && (
               <>
                 <div className="flex gap-2">
