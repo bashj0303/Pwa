@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2, Flame, RotateCcw, Settings, Target, Zap, ShieldAlert, Bot, Loader2, Camera, X } from 'lucide-react';
 
 const DB = {
@@ -20,23 +20,18 @@ const DB = {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const BAD_FOODS = {
-  'nutella': { fr: "du beurre d'amande ou d'arachide avec du cacao pur", en: "almond butter or peanut butter with pure cocoa" },
-  'mcdo': { fr: "un burger maison avec steak haché 5% MG", en: "a homemade burger with 5% fat minced beef" },
-  'pizza': { fr: "un wrap pizza protéiné ou une pâte au chou-fleur", en: "a protein pizza wrap or cauliflower crust" }
-};
-
 const Nutrition = ({ t }) => {
-  // On détecte la langue basée sur l'objet t passé par App.jsx
-  const isFr = t.month === 'mois'; 
+  // Détection dynamique de la langue
+  const isFr = useMemo(() => t.month === 'mois', [t]);
 
-  const vocab = {
+  // Vocabulaire synchronisé avec l'état de traduction
+  const vocab = useMemo(() => ({
     title: isFr ? 'Diète' : 'Diet',
     clearAll: isFr ? 'Effacer la journée ?' : 'Clear today?',
     setGoalsTitle: isFr ? 'Ajuster mes objectifs' : 'Adjust goals',
     namePlaceholder: isFr ? 'Ex: Riz' : 'Ex: Rice',
     qtyPlaceholder: isFr ? 'Qté' : 'Qty',
-    emptyState: isFr ? 'Aucun repas ce jour-là. Ajoute ton premier plat.' : 'No meals for this day. Add a dish.',
+    emptyState: isFr ? 'Aucun repas ce jour-là.' : 'No meals today.',
     days: isFr ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     setupTitle: isFr ? 'Configuration Diète' : 'Diet Setup',
     btnGuided: isFr ? 'Calculateur Macros' : 'Macro Calculator',
@@ -52,13 +47,12 @@ const Nutrition = ({ t }) => {
     protein: isFr ? 'Protéines (g)' : 'Protein (g)',
     carbs: isFr ? 'Glucides (g)' : 'Carbs (g)',
     fat: isFr ? 'Lipides (g)' : 'Fat (g)',
-    doneBtn: isFr ? 'TERMINÉ' : 'DONE'
-  };
+  }), [isFr]);
 
   const getTodayIndex = () => { let day = new Date().getDay(); return day === 0 ? 6 : day - 1; };
   
   const [setupState, setSetupState] = useState(() => localStorage.getItem('pos_nutri_setup') || 'none');
-  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_goals')) || null);
+  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_goals')) || { calories: 2000, protein: 150, carbs: 200, fat: 60 });
   const [activeDay, setActiveDay] = useState(getTodayIndex());
   const [weeklyFoods, setWeeklyFoods] = useState(() => JSON.parse(localStorage.getItem('pos_nutri_weekly_v4')) || { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] });
   const [showSettings, setShowSettings] = useState(false);
@@ -73,18 +67,18 @@ const Nutrition = ({ t }) => {
   const fileInputRef = useRef(null);
 
   useEffect(() => localStorage.setItem('pos_nutri_weekly_v4', JSON.stringify(weeklyFoods)), [weeklyFoods]);
-  useEffect(() => { if (goals) localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)); }, [goals]);
+  useEffect(() => localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)), [goals]);
   useEffect(() => localStorage.setItem('pos_nutri_setup', setupState), [setupState]);
 
   useEffect(() => {
     const dayFoods = weeklyFoods[activeDay] || [];
-    const t = dayFoods.reduce((acc, item) => ({
+    const tTotal = dayFoods.reduce((acc, item) => ({
       k: acc.k + (Number(item.k) || 0),
       p: acc.p + (Number(item.p) || 0),
       c: acc.c + (Number(item.c) || 0),
       f: acc.f + (Number(item.f) || 0),
     }), { k: 0, p: 0, c: 0, f: 0 });
-    setTotals(t);
+    setTotals(tTotal);
   }, [weeklyFoods, activeDay]);
 
   const handleImageCapture = (e) => {
@@ -108,10 +102,10 @@ const Nutrition = ({ t }) => {
     try {
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
       const modelsData = await modelsRes.json();
-      const validModel = modelsData.models.find(m => (m.name.includes('1.5-flash')) && m.supportedGenerationMethods.includes('generateContent')) || modelsData.models[0];
+      const validModel = modelsData.models.find(m => m.name.includes('1.5-flash')) || modelsData.models[0];
 
-      let promptText = `Act as a nutrition expert. Analyze this: "${aiInput}". Estimate macros. Return ONLY JSON: {"name": "Food Name", "k": calories, "p": protein, "c": carbs, "f": fat}. Use English for name.`;
-      if (isFr) promptText = `Agis en expert nutrition. Analyse ceci: "${aiInput}". Estime les macros. Retourne UNIQUEMENT du JSON: {"name": "Nom de l'aliment", "k": calories, "p": proteines, "c": glucides, "f": lipides}. Utilise le Français pour le nom.`;
+      let promptText = `Analyze this food: "${aiInput}". Return ONLY JSON: {"name": "Food Name", "k": calories, "p": protein, "c": carbs, "f": fat}.`;
+      if (isFr) promptText = `Analyse cet aliment: "${aiInput}". Retourne UNIQUEMENT du JSON: {"name": "Nom", "k": calories, "p": proteines, "c": glucides, "f": lipides}.`;
 
       const promptParts = [{ text: promptText }];
       if (imageBase64) promptParts.push({ inlineData: { mimeType: "image/jpeg", data: imageBase64 } });
@@ -182,7 +176,11 @@ const Nutrition = ({ t }) => {
           </div>
         </div>
         <div className="flex justify-between items-center bg-black/40 p-1 rounded-xl border border-slate-700/50 mb-5 overflow-x-auto">
-          {vocab.days.map((d, i) => <button key={i} onClick={() => setActiveDay(i)} className={`flex-1 py-1.5 px-2 text-[10px] font-bold rounded-lg transition-colors whitespace-nowrap ${activeDay === i ? 'bg-[#ccff00] text-black shadow-sm' : 'text-slate-500 hover:text-white'}`}>{d}</button>)}
+          {vocab.days.map((d, i) => (
+            <button key={i} onClick={() => setActiveDay(i)} className={`flex-1 py-1.5 px-2 text-[10px] font-bold rounded-lg transition-colors whitespace-nowrap ${activeDay === i ? 'bg-[#ccff00] text-black shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+              {vocab.days[i]}
+            </button>
+          ))}
         </div>
         {goals && (
           <>
@@ -191,9 +189,9 @@ const Nutrition = ({ t }) => {
               <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500" style={{ width: `${getPercent(totals.k, goals.calories)}%` }}></div></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              {[ { l: isFr ? 'PROTÉINES' : 'PROTEIN', v: totals.p, m: goals.protein, color: 'bg-blue-500' }, { l: isFr ? 'GLUCIDES' : 'CARBS', v: totals.c, m: goals.carbs, color: 'bg-amber-500' }, { l: isFr ? 'LIPIDES' : 'FAT', v: totals.f, m: goals.fat, color: 'bg-purple-500' } ].map((stat, i) => (
+              {[ { l: vocab.protein, v: totals.p, m: goals.protein, color: 'bg-blue-500' }, { l: vocab.carbs, v: totals.c, m: goals.carbs, color: 'bg-amber-500' }, { l: vocab.fat, v: totals.f, m: goals.fat, color: 'bg-purple-500' } ].map((stat, i) => (
                 <div key={i} className="flex flex-col gap-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">{stat.l}</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase truncate">{stat.l}</span>
                   <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div className={`h-full ${stat.color} transition-all duration-500`} style={{ width: `${getPercent(stat.v, stat.m)}%` }}></div></div>
                   <span className="text-[10px] font-black text-slate-300">{stat.v}g <span className="text-slate-600 font-normal">/ {stat.m}</span></span>
                 </div>
