@@ -71,7 +71,7 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // IA GEMINI - JSON FORCÉ + DEBUG AVANCÉ
+  // IA GEMINI - MODÈLE 1.5 PRO 
   // ==========================================
   const handleAIAnalyze = async () => {
     if (!aiInput.trim()) return;
@@ -87,25 +87,24 @@ const Nutrition = ({ t }) => {
     `;
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      // CHANGEMENT ICI : gemini-1.5-pro au lieu de gemini-1.5-flash
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptText }] }],
-          // LE TRUC MAGIQUE DE GOOGLE :
           generationConfig: { responseMimeType: "application/json" }
         })
       });
 
       const data = await response.json();
       
-      // Si Google nous bloque (clé invalide, erreur serveur, etc.), on affiche SA VRAIE ERREUR
       if (!response.ok) {
         throw new Error(data.error?.message || "Erreur inconnue de l'API Google");
       }
 
       if (!data.candidates || !data.candidates[0].content) {
-        throw new Error("Google a bloqué la réponse (Probablement une alerte de sécurité).");
+        throw new Error("Google a bloqué la réponse.");
       }
 
       const rawText = data.candidates[0].content.parts[0].text;
