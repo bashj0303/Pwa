@@ -130,35 +130,58 @@ const Workout = ({ t }) => {
     if (!aiInput.trim()) return;
     setIsAiLoading(true);
 
-    const promptText = `
-      Tu es un coach sportif expert en musculation et hypertrophie.
-      L'utilisateur te demande de lui créer un entraînement avec cette contrainte : "${aiInput}".
-      
-      Crée un programme d'entraînement adapté. Tu DOIS répondre UNIQUEMENT avec un tableau JSON valide. Pas de texte avant, pas de texte après, pas de markdown.
-      
-      Format exact exigé :
-      [
-        {"id": "id_unique_1", "name": "Nom de l'exercice 1", "sets": "4", "targetReps": "10-12"},
-        {"id": "id_unique_2", "name": "Nom de l'exercice 2", "sets": "3", "targetReps": "failure"}
-      ]
-    `;
-
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      // 1. CHERCHER LE BON MODÈLE (Auto-Detector)
+      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+      const modelsData = await modelsRes.json();
+      
+      if (!modelsRes.ok) throw new Error(modelsData.error?.message || "Impossible de lister les modèles.");
+
+      const validModelObj = modelsData.models.find(m => 
+        m.name.includes('gemini') && m.supportedGenerationMethods.includes('generateContent')
+      );
+
+      if (!validModelObj) throw new Error("Aucun modèle fonctionnel trouvé.");
+      const exactModelName = validModelObj.name;
+
+      // 2. ENVOYER LA REQUÊTE AU MODÈLE
+      const promptText = `
+        Agis comme un coach sportif expert. 
+        Contrainte de l'utilisateur : "${aiInput}".
+        
+        Crée un programme d'entraînement adapté à cette contrainte. 
+        INSTRUCTION STRICTE : Retourne UNIQUEMENT un tableau JSON valide. Pas de texte avant, pas de markdown.
+        Format exact exigé (un tableau d'objets) :
+        [
+          {"name": "Nom de l'exercice 1", "sets": "4", "targetReps": "10-12"},
+          {"name": "Nom de l'exercice 2", "sets": "3", "targetReps": "Echec"}
+        ]
+      `;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${exactModelName}:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
       });
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
+      if (!response.ok) throw new Error(data.error?.message || "Erreur de génération.");
 
       let rawText = data.candidates[0].content.parts[0].text;
-      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      // EXTRACTEUR BLINDÉ POUR LES TABLEAUX (ARRAY [])
+      const startIndex = rawText.indexOf('[');
+      const endIndex = rawText.lastIndexOf(']');
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        rawText = rawText.substring(startIndex, endIndex + 1);
+      } else {
+        throw new Error("L'IA n'a pas retourné de programme valide.");
+      }
       
       const parsedWorkout = JSON.parse(rawText);
 
-      // On ajoute les emojis robots aux noms et on s'assure que les IDs sont uniques
+      // On ajoute les IDs et l'emoji ⚡
       const finalWorkout = parsedWorkout.map((ex, idx) => ({
         id: `ai_${Date.now()}_${idx}`,
         name: ex.name + " ⚡",
@@ -166,21 +189,20 @@ const Workout = ({ t }) => {
         targetReps: ex.targetReps || "10"
       }));
 
-      // On écrase la journée active avec le nouveau programme IA
+      // Met à jour la journée active
       setRoutine(prev => ({ 
         ...prev, 
         [activeDay]: finalWorkout 
       }));
 
-      // On efface les anciens logs pour cette journée
+      // Efface les anciens logs pour faire de la place au nouveau programme
       setLogs({});
-
       setAiInput('');
       setShowAIWorkout(false);
 
     } catch (error) {
       console.error("Erreur Gemini Workout:", error);
-      alert("Erreur avec l'IA. Essaye de reformuler ta demande.");
+      alert("🚨 ERREUR GOOGLE : " + error.message);
     } finally {
       setIsAiLoading(false);
     }
