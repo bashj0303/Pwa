@@ -30,7 +30,7 @@ const BAD_FOODS = {
 };
 
 const Nutrition = ({ t }) => {
-  const isFr = t.month === 'mois';
+  const isFr = t?.month === 'mois' || true;
   const vocab = {
     title: isFr ? 'Diète' : 'Diet', clearAll: isFr ? 'Effacer la journée ?' : 'Clear today?',
     setGoalsTitle: isFr ? 'Ajuster mes objectifs' : 'Adjust goals', namePlaceholder: isFr ? 'Ex: Riz' : 'Ex: Rice',
@@ -230,7 +230,7 @@ const Nutrition = ({ t }) => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-black text-white flex items-center gap-2"><Flame className="text-orange-500" size={20} /> {vocab.title}</h2>
           <div className="flex gap-2">
-            <button onClick={() => setShowSettings(!showSettings)} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"><Settings size={16} /></button>
+            <button onClick={() => setShowSettings(true)} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"><Settings size={16} /></button>
             <button onClick={() => { if(window.confirm(vocab.clearAll)) setWeeklyFoods(p => ({...p, [activeDay]: []})) }} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors"><RotateCcw size={16} /></button>
           </div>
         </div>
@@ -344,6 +344,44 @@ const Nutrition = ({ t }) => {
             )}
         </div>
       </div>
+
+      {/* --- MODAL DES PARAMÈTRES (ENGRENAGE) --- */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-[2rem] w-full max-w-sm shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-white flex items-center gap-2"><Settings size={20} className="text-[#ccff00]"/> {vocab.setGoalsTitle}</h3>
+              <button onClick={() => setShowSettings(false)} className="bg-slate-800 p-2 rounded-full text-slate-400 hover:text-white hover:bg-red-500/20 transition-colors"><X size={20} /></button>
+            </div>
+            
+            <div className="space-y-4">
+              {[
+                { label: isFr ? 'Calories' : 'Calories', key: 'calories', color: 'text-orange-500' },
+                { label: isFr ? 'Protéines (g)' : 'Protein (g)', key: 'protein', color: 'text-blue-500' },
+                { label: isFr ? 'Glucides (g)' : 'Carbs (g)', key: 'carbs', color: 'text-amber-500' },
+                { label: isFr ? 'Lipides (g)' : 'Fat (g)', key: 'fat', color: 'text-purple-500' }
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
+                  <label className={`font-black text-sm ${item.color}`}>{item.label}</label>
+                  <input 
+                    type="number" 
+                    value={goals[item.key]} 
+                    onChange={(e) => setGoals({...goals, [item.key]: Number(e.target.value)})} 
+                    className="w-24 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-black text-center outline-none focus:border-[#ccff00] transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setShowSettings(false)} className="w-full mt-6 bg-[#ccff00] text-black font-black py-4 rounded-xl hover:bg-[#b3e600] transition-transform hover:scale-[1.02] shadow-lg flex justify-center items-center gap-2">
+              <Target size={20} />
+              {isFr ? 'Enregistrer' : 'Save Goals'}
+            </button>
+          </div>
+        </div>
+      )}
+      {/* ---------------------------------------- */}
+
     </div>
   );
 };
