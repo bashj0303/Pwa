@@ -15,7 +15,7 @@ const DB = {
   'banane': { k: 90, p: 1, c: 23, f: 0.3, u: '1 unité' },
   'skyr': { k: 60, p: 10, c: 4, f: 0, u: '100g' },
   'amandes': { k: 580, p: 21, c: 22, f: 50, u: '100g' },
-  'huile': { k: 90, p: 0, c: 0, f: 10, u: '1 unité' },
+  'huile': { k: 90, p: 0, c: 0, f: 10, u: '1 c.à.s' },
   'avocat': { k: 160, p: 2, c: 9, f: 15, u: '100g' },
 };
 
@@ -49,8 +49,8 @@ const Nutrition = ({ t }) => {
     btnManual: isFr ? 'Entrée Manuelle' : 'Manual Entry',
     stepGender: isFr ? 'Sexe' : 'Gender',
     stepAge: isFr ? 'Âge' : 'Age',
-    stepWeight: isFr ? 'Poids (lbs)' : 'Weight (lbs)',
-    stepHeight: isFr ? 'Taille (cm)' : 'Height (cm)',
+    stepWeight: isFr ? 'Poids' : 'Weight',
+    stepHeight: isFr ? 'Taille' : 'Height',
     stepActivity: isFr ? 'Activité' : 'Activity',
     stepGoal: isFr ? 'Objectif' : 'Goal',
     actLow: isFr ? 'Sédentaire' : 'Sedentary',
@@ -64,7 +64,11 @@ const Nutrition = ({ t }) => {
     // Coach Alert
     coachAlertTitle: isFr ? '⚠️ ALERTE COACH' : '⚠️ COACH ALERT',
     coachAlertBtnIgnore: isFr ? 'Je gère (Ajouter)' : 'I got this (Add)',
-    coachAlertBtnFix: isFr ? 'Changer pour l\'alternative' : 'Swap for alternative'
+    coachAlertBtnFix: isFr ? 'Changer pour l\'alternative' : 'Swap for alternative',
+
+    // Unités
+    ft: 'ft',
+    in: 'in'
   };
 
   // --- ÉTATS GLOBAUX ---
@@ -83,8 +87,19 @@ const Nutrition = ({ t }) => {
   // État du Coach Junk Food
   const [coachAlert, setCoachAlert] = useState({ active: false, foodName: '', altText: '' });
 
-  // --- ÉTATS ONBOARDING GUIDÉ ---
-  const [guideData, setGuideData] = useState({ gender: 'M', age: 25, weight: 160, height: 175, activity: 1.55, goal: -500 });
+  // --- ÉTATS ONBOARDING GUIDÉ (Avec Unités) ---
+  const [guideData, setGuideData] = useState({ 
+    gender: 'M', 
+    age: 25, 
+    weight: 160, 
+    weightUnit: 'lbs', // 'lbs' ou 'kg'
+    height: 175, 
+    heightFt: 5,
+    heightIn: 9,
+    heightUnit: 'cm', // 'cm' ou 'ft'
+    activity: 1.55, 
+    goal: -500 
+  });
 
   useEffect(() => localStorage.setItem('pos_nutri_weekly_v4', JSON.stringify(weeklyFoods)), [weeklyFoods]);
   useEffect(() => { if (goals) localStorage.setItem('pos_nutri_goals', JSON.stringify(goals)); }, [goals]);
@@ -97,18 +112,27 @@ const Nutrition = ({ t }) => {
     setTotals(t);
   }, [weeklyFoods, activeDay]);
 
-  // --- LOGIQUE ONBOARDING GUIDÉ (Mifflin-St Jeor) ---
+  // --- LOGIQUE ONBOARDING GUIDÉ (Mifflin-St Jeor avec conversions universelles) ---
   const calculateGuidedMacros = () => {
-    const weightKg = guideData.weight / 2.20462;
+    // Convertir le poids en KG pour la formule scientifique
+    const weightKg = guideData.weightUnit === 'lbs' ? guideData.weight / 2.20462 : guideData.weight;
+    // Convertir le poids en LBS pour le calcul des protéines (1g par lb)
+    const weightLbs = guideData.weightUnit === 'lbs' ? guideData.weight : guideData.weight * 2.20462;
+    
+    // Convertir la taille en CM pour la formule scientifique
+    const heightCm = guideData.heightUnit === 'ft' 
+      ? (guideData.heightFt * 30.48) + (guideData.heightIn * 2.54) 
+      : guideData.height;
+
     // BMR (Mifflin-St Jeor)
-    let bmr = (10 * weightKg) + (6.25 * guideData.height) - (5 * guideData.age);
+    let bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * guideData.age);
     bmr = guideData.gender === 'M' ? bmr + 5 : bmr - 161;
     
     const tdee = bmr * guideData.activity;
     const targetCalories = Math.round(tdee + guideData.goal);
     
     // Macros focus Musculation
-    const targetProtein = Math.round(guideData.weight * 1.0); // 1g par lb de poids de corps
+    const targetProtein = Math.round(weightLbs * 1.0); // 1g par lb de poids de corps
     const targetFat = Math.round((targetCalories * 0.25) / 9); // 25% des calories en lipides
     const targetCarbs = Math.round((targetCalories - (targetProtein * 4) - (targetFat * 9)) / 4); // Le reste en glucides
 
@@ -119,7 +143,7 @@ const Nutrition = ({ t }) => {
   const setManualMode = () => {
     setGoals({ calories: 2000, protein: 150, carbs: 200, fat: 60 });
     setSetupState('done');
-    setShowSettings(true); // Ouvre les settings direct pour qu'il modifie
+    setShowSettings(true);
   };
 
   // --- LOGIQUE D'AJOUT & IA COACH ---
@@ -145,7 +169,7 @@ const Nutrition = ({ t }) => {
 
     if (badFoodMatch) {
       setCoachAlert({ active: true, foodName: form.name, altText: BAD_FOODS[badFoodMatch] });
-      return; // On bloque l'ajout, on affiche l'alerte
+      return; 
     }
 
     finalizeAddEntry(form.name);
@@ -169,7 +193,6 @@ const Nutrition = ({ t }) => {
     setForm({ name: '', qty: '', k: '', p: '', c: '', f: '' });
     setCoachAlert({ active: false, foodName: '', altText: '' });
   };
-
 
   // ==========================================
   // VUE 1 : ÉCRAN DE CHOIX (ONBOARDING)
@@ -195,7 +218,7 @@ const Nutrition = ({ t }) => {
   }
 
   // ==========================================
-  // VUE 2 : FORMULAIRE GUIDÉ
+  // VUE 2 : FORMULAIRE GUIDÉ (AVEC UNITÉS)
   // ==========================================
   if (setupState === 'guided') {
     return (
@@ -208,32 +231,64 @@ const Nutrition = ({ t }) => {
           <div className="space-y-4">
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepGender}</label>
-                <select value={guideData.gender} onChange={e => setGuideData({...guideData, gender: e.target.value})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold">
-                  <option value="M">Homme</option>
-                  <option value="F">Femme</option>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{vocab.stepGender}</label>
+                <select value={guideData.gender} onChange={e => setGuideData({...guideData, gender: e.target.value})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold">
+                  <option value="M">{isFr ? 'Homme' : 'Male'}</option>
+                  <option value="F">{isFr ? 'Femme' : 'Female'}</option>
                 </select>
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepAge}</label>
-                <input type="number" value={guideData.age} onChange={e => setGuideData({...guideData, age: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold" />
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{vocab.stepAge}</label>
+                <input type="number" value={guideData.age} onChange={e => setGuideData({...guideData, age: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold" />
               </div>
             </div>
 
             <div className="flex gap-4">
+              {/* POIDS AVEC BOUTON BASCULE */}
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepWeight}</label>
-                <input type="number" value={guideData.weight} onChange={e => setGuideData({...guideData, weight: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepWeight}</label>
+                  <button 
+                    onClick={() => setGuideData({...guideData, weightUnit: guideData.weightUnit === 'lbs' ? 'kg' : 'lbs'})}
+                    className="text-[9px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-[#ccff00] font-black transition-colors"
+                  >
+                    {guideData.weightUnit.toUpperCase()}
+                  </button>
+                </div>
+                <input type="number" value={guideData.weight} onChange={e => setGuideData({...guideData, weight: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold" />
               </div>
+              
+              {/* TAILLE AVEC BOUTON BASCULE */}
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepHeight}</label>
-                <input type="number" value={guideData.height} onChange={e => setGuideData({...guideData, height: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepHeight}</label>
+                  <button 
+                    onClick={() => setGuideData({...guideData, heightUnit: guideData.heightUnit === 'cm' ? 'ft' : 'cm'})}
+                    className="text-[9px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-[#ccff00] font-black transition-colors"
+                  >
+                    {guideData.heightUnit.toUpperCase()}
+                  </button>
+                </div>
+                {guideData.heightUnit === 'cm' ? (
+                  <input type="number" value={guideData.height} onChange={e => setGuideData({...guideData, height: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold" />
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input type="number" value={guideData.heightFt} onChange={e => setGuideData({...guideData, heightFt: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold pr-6" />
+                      <span className="absolute right-2 top-3.5 text-xs font-bold text-slate-500">{vocab.ft}</span>
+                    </div>
+                    <div className="relative flex-1">
+                      <input type="number" value={guideData.heightIn} onChange={e => setGuideData({...guideData, heightIn: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold pr-6" />
+                      <span className="absolute right-2 top-3.5 text-xs font-bold text-slate-500">{vocab.in}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepActivity}</label>
-              <select value={guideData.activity} onChange={e => setGuideData({...guideData, activity: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{vocab.stepActivity}</label>
+              <select value={guideData.activity} onChange={e => setGuideData({...guideData, activity: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold">
                 <option value={1.2}>{vocab.actLow}</option>
                 <option value={1.55}>{vocab.actMed}</option>
                 <option value={1.725}>{vocab.actHigh}</option>
@@ -241,8 +296,8 @@ const Nutrition = ({ t }) => {
             </div>
 
             <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{vocab.stepGoal}</label>
-              <select value={guideData.goal} onChange={e => setGuideData({...guideData, goal: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl mt-1 outline-none focus:border-[#ccff00] border border-transparent font-bold">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{vocab.stepGoal}</label>
+              <select value={guideData.goal} onChange={e => setGuideData({...guideData, goal: Number(e.target.value)})} className="w-full bg-slate-800 text-white p-3 rounded-xl outline-none focus:border-[#ccff00] border border-transparent font-bold">
                 <option value={-500}>{vocab.goalCut}</option>
                 <option value={0}>{vocab.goalMaintain}</option>
                 <option value={300}>{vocab.goalBulk}</option>
@@ -294,7 +349,10 @@ const Nutrition = ({ t }) => {
         {/* REGLAGES OBJECTIFS MANUELS */}
         {showSettings && goals && (
           <div className="mb-6 p-4 bg-black/40 rounded-xl border border-slate-700/50 animate-in fade-in">
-            <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">{vocab.setGoalsTitle}</h3>
+            <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider flex justify-between items-center">
+              {vocab.setGoalsTitle}
+              <button onClick={() => setSetupState('guided')} className="text-[#ccff00] flex items-center gap-1 bg-slate-800 px-2 py-1 rounded"><Zap size={10}/> IA</button>
+            </h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-800 p-2 rounded-lg"><span className="text-[10px] text-slate-500 uppercase font-bold">Calories</span><input type="number" value={goals.calories} onChange={e => setGoals({...goals, calories: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" /></div>
               <div className="bg-slate-800 p-2 rounded-lg border-l-2 border-blue-500"><span className="text-[10px] text-slate-500 uppercase font-bold">Protéines (g)</span><input type="number" value={goals.protein} onChange={e => setGoals({...goals, protein: Number(e.target.value)})} className="bg-transparent w-full text-white font-black text-[16px] focus:outline-none" /></div>
@@ -371,7 +429,7 @@ const Nutrition = ({ t }) => {
             <div className="space-y-3">
               <button 
                 onClick={() => {
-                  setForm(prev => ({...prev, name: coachAlert.altText.split(' ')[0]})); // Met un bout de l'alternative dans la case
+                  setForm(prev => ({...prev, name: coachAlert.altText.split(' ')[0]}));
                   setCoachAlert({active: false, foodName: '', altText: ''});
                 }} 
                 className="w-full bg-[#ccff00] text-black font-black py-3 rounded-xl hover:scale-105 transition-transform"
