@@ -71,48 +71,67 @@ const Nutrition = ({ t }) => {
   }, [weeklyFoods, activeDay]);
 
   // ==========================================
-  // IA GEMINI - RETOUR AU MODÈLE QUI MARCHAIT (FLASH) + SÉCURITÉ
+  // IA GEMINI - LE DÉTECTEUR DE MODÈLE AUTO
   // ==========================================
   const handleAIAnalyze = async () => {
     if (!aiInput.trim()) return;
     setIsAiLoading(true);
 
-    const promptText = `
-      Agis comme un calculateur de macros. 
-      Aliment(s) mangé(s) : "${aiInput}".
-      
-      Retourne UNIQUEMENT un objet JSON. 
-      Format exact : {"name": "Nom du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
-    `;
-
     try {
-      // ON REMET gemini-1.5-flash ET ON LUI FORCE LE FORMAT JSON
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      // 1. CHERCHER LE MODÈLE QUI MARCHE
+      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+      const modelsData = await modelsRes.json();
+      
+      if (!modelsRes.ok) throw new Error(modelsData.error?.message || "Impossible de lister les modèles.");
+
+      // On trouve le premier modèle "gemini" qui a le droit de générer du contenu
+      const validModelObj = modelsData.models.find(m => 
+        m.name.includes('gemini') && 
+        m.supportedGenerationMethods.includes('generateContent')
+      );
+
+      if (!validModelObj) throw new Error("Aucun modèle Gemini fonctionnel trouvé sur ce compte.");
+
+      const exactModelName = validModelObj.name; // Ça donnera le bon nom (ex: "models/gemini-1.5-flash-latest")
+      console.log("Modèle trouvé et utilisé :", exactModelName);
+
+      // 2. ENVOYER LA REQUÊTE AU BON MODÈLE
+      const promptText = `
+        Agis comme un calculateur de macros nutritionnelles. 
+        Aliment(s) mangé(s) : "${aiInput}".
+        Retourne UNIQUEMENT un objet JSON, sans texte autour. 
+        Format exact : {"name": "Nom court du repas", "k": calories, "p": proteines, "c": glucides, "f": lipides}
+      `;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${exactModelName}:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: { responseMimeType: "application/json" }
+          contents: [{ parts: [{ text: promptText }] }]
         })
       });
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error?.message || "Erreur API Google");
-      }
+      if (!response.ok) throw new Error(data.error?.message || "Erreur lors de l'analyse.");
 
       let rawText = data.candidates[0].content.parts[0].text;
+      
+      // Filtre anti-crash
+      const startIndex = rawText.indexOf('{');
+      const endIndex = rawText.lastIndexOf('}');
+      if (startIndex !== -1 && endIndex !== -1) {
+        rawText = rawText.substring(startIndex, endIndex + 1);
+      } else {
+        throw new Error("L'IA n'a pas retourné de JSON.");
+      }
+
       const parsedData = JSON.parse(rawText);
 
       const newFood = {
-        id: Date.now(),
-        time: timeStr,
-        name: parsedData.name + " 🤖",
-        k: Number(parsedData.k) || 0,
-        p: Number(parsedData.p) || 0,
-        c: Number(parsedData.c) || 0,
-        f: Number(parsedData.f) || 0
+        id: Date.now(), time: timeStr,
+        name: parsedData.name + " 🤖", k: Number(parsedData.k) || 0,
+        p: Number(parsedData.p) || 0, c: Number(parsedData.c) || 0, f: Number(parsedData.f) || 0
       };
 
       setWeeklyFoods(prev => ({ 
@@ -125,7 +144,7 @@ const Nutrition = ({ t }) => {
 
     } catch (error) {
       console.error("Erreur Gemini détaillée:", error);
-      alert("🚨 ERREUR : " + error.message);
+      alert("🚨 ERREUR GOOGLE : " + error.message);
     } finally {
       setIsAiLoading(false);
     }
