@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share, Zap, Lock, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Activity, Wallet, Dumbbell, FlaskConical, Gift, UtensilsCrossed, Crown, Download, Trash2, Globe, Share, Zap, Lock, ShieldCheck, CheckCircle2, Brain } from 'lucide-react';
 
 import Dashboard from './Dashboard';
 import Budget from './Budget';
@@ -7,6 +7,7 @@ import Workout from './Workout';
 import Lab from './Lab';
 import Reward from './Reward';
 import Nutrition from './Nutrition';
+import Mental from './Mental';
 
 const App = () => {
   const loadState = (key, defaultValue) => {
@@ -57,7 +58,7 @@ const App = () => {
   const translations = {
     en: {
       appTitle: 'Grindup.pro', tabDashboard: 'Overview', tabBudget: 'Budget', tabWorkout: 'Training',
-      tabLab: 'Lab', tabReward: 'Rewards', tabNutrition: 'Diet',
+      tabLab: 'Lab', tabReward: 'Rewards', tabNutrition: 'Diet', tabMental: 'Mind',
       welcome: 'Welcome to the Grind.',
       budgetLeft: 'Remaining', biohacking: 'Biohacking & Habits',
       pwTitle: 'UNLOCK YOUR POTENTIAL', pwSubtitle: 'The ultimate Life OS for the dedicated 1%.',
@@ -68,7 +69,7 @@ const App = () => {
     },
     fr: {
       appTitle: 'Grindup.pro', tabDashboard: 'Aperçu', tabBudget: 'Budget', tabWorkout: 'Training',
-      tabLab: 'Labo', tabReward: 'Rewards', tabNutrition: 'Diète',
+      tabLab: 'Labo', tabReward: 'Rewards', tabNutrition: 'Diète', tabMental: 'Mental',
       welcome: 'Bienvenue dans le Grind.',
       budgetLeft: 'Restant', biohacking: 'Biohacking & Habitudes',
       pwTitle: 'DÉBLOQUE TON POTENTIEL', pwSubtitle: 'Le "Life OS" ultime pour le 1% qui grind.',
@@ -81,6 +82,7 @@ const App = () => {
 
   const t = translations[lang] || translations['en'];
   const toggleLanguage = () => setLang(lang === 'en' ? 'fr' : 'en');
+  const isFr = lang === 'fr';
 
   // =========================================================================
   // ÉCRAN 1 : CHOIX DE LA LANGUE (Première ouverture)
@@ -174,6 +176,7 @@ const App = () => {
               {activeTab === 'workout' && t.tabWorkout}
               {activeTab === 'lab' && t.tabLab}
               {activeTab === 'reward' && t.tabReward}
+              {activeTab === 'mental' && t.tabMental}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -196,6 +199,7 @@ const App = () => {
           {activeTab === 'workout' && <Workout t={t} />}
           {activeTab === 'lab' && <Lab t={t} />}
           {activeTab === 'reward' && <Reward t={t} xp={xp} setXp={setXp} />}
+          {activeTab === 'mental' && <Mental t={t} />}
         </main>
 
         <nav className="fixed bottom-0 w-full max-w-md bg-[#0f172a]/95 backdrop-blur-xl border-t border-slate-800 px-2 py-4 z-40 pb-6">
@@ -206,7 +210,8 @@ const App = () => {
               { id: 'nutrition', icon: UtensilsCrossed, label: t.tabNutrition },
               { id: 'workout', icon: Dumbbell, label: t.tabWorkout },
               { id: 'lab', icon: FlaskConical, label: t.tabLab },
-              { id: 'reward', icon: Gift, label: t.tabReward }
+              { id: 'reward', icon: Gift, label: t.tabReward },
+              { id: 'mental', icon: Brain, label: t.tabMental }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
