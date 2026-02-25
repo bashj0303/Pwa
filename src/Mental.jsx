@@ -29,12 +29,16 @@ export default function Mental() {
 
   const callGeminiChatAPI = async (chatHistory) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
-    
     if (!apiKey) throw new Error("Clé API introuvable !");
 
-    // L'URL corrigée avec la syntaxe qui marche
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 🔥 ÉTAPE 1 : TA MÉTHODE (On va chercher la liste dynamique des modèles de Google)
+    const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const modelsData = await modelsRes.json();
+    
+    // On trouve le modèle 1.5-flash dans SA liste
+    const validModel = modelsData.models.find(m => m.name.includes('1.5-flash')) || modelsData.models[0];
 
+    // Formatage de l'historique
     let formattedContents = [];
     const relevantHistory = chatHistory.filter(msg => msg.id !== 1);
 
@@ -57,20 +61,18 @@ export default function Mental() {
       systemInstruction: { parts: [{ text: systemPrompt }] }
     };
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+    // 🔥 ÉTAPE 2 : On fait l'appel avec le VRAI nom du modèle (validModel.name)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${validModel.name}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-      if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+    const data = await response.json();
+    
+    if (data.error) throw new Error(data.error.message);
 
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je suis à court de mots.";
-    } catch (err) {
-      throw err; 
-    }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je suis à court de mots.";
   };
 
   const handleSendMessage = async (e) => {
@@ -90,7 +92,8 @@ export default function Mental() {
       const newAiMessage = { id: Date.now() + 1, sender: 'ai', text: responseText };
       setMessages((prev) => [...prev, newAiMessage]);
     } catch (error) {
-      setApiError("Erreur de connexion avec l'IA.");
+      console.error(error);
+      setApiError("Erreur : " + error.message);
     } finally {
       setIsLoading(false);
     }
