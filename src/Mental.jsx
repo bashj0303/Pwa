@@ -5,7 +5,6 @@ export default function Mental() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
   
-  // Historique de la conversation
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -19,9 +18,7 @@ export default function Mental() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // LE PROMPT
   const systemPrompt = `Tu es "GrindMind", un confident sage, profond et intellectuellement pointu. Tu dialogues sous forme de chat. 
-
   RÈGLES DU DIALOGUE :
   1. CONCISION : Réponds en 1, 2 ou 3 courts paragraphes maximum.
   2. EMPATHIE : Valide toujours l'émotion de l'utilisateur ("C'est une grande quête de chercher la vérité...").
@@ -30,15 +27,14 @@ export default function Mental() {
   5. MÉTHODE SOCRATIQUE : Au lieu de dire "L'Islam a raison", déconstruis les dogmes avec des questions douces et logiques pour faire réaliser la vérité à l'utilisateur.
   6. Respecte toujours profondément Jésus (Îsâ) comme un des plus grands prophètes.`;
 
-  // L'APPEL À L'API
   const callGeminiChatAPI = async (chatHistory) => {
-    // ⚠️ La clé est récupérée dynamiquement et de manière sécurisée via Vercel
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
     
-    // L'adresse de l'API avec le modèle standard (gemini-1.5-flash)
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    if (!apiKey) throw new Error("Clé API introuvable !");
 
-    // Formatage de l'historique
+    // L'URL corrigée avec la syntaxe qui marche
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
     let formattedContents = [];
     const relevantHistory = chatHistory.filter(msg => msg.id !== 1);
 
@@ -68,14 +64,11 @@ export default function Mental() {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error(`Erreur de l'API (${response.status})`);
-      }
+      if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
 
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je suis à court de mots.";
     } catch (err) {
-      console.error("Crash de la connexion à l'IA :", err);
       throw err; 
     }
   };
@@ -84,7 +77,6 @@ export default function Mental() {
     if (e) e.preventDefault();
     if (!inputMessage.trim() || isLoading) return;
 
-    // Ajout du message utilisateur
     const newUserMessage = { id: Date.now(), sender: 'user', text: inputMessage.trim() };
     const newMessagesHistory = [...messages, newUserMessage];
     
@@ -93,111 +85,90 @@ export default function Mental() {
     setIsLoading(true);
     setApiError(null);
 
-    // Appel à l'API
     try {
       const responseText = await callGeminiChatAPI(newMessagesHistory);
-      
-      const newAiMessage = { 
-        id: Date.now() + 1, 
-        sender: 'ai', 
-        text: responseText 
-      };
-      
+      const newAiMessage = { id: Date.now() + 1, sender: 'ai', text: responseText };
       setMessages((prev) => [...prev, newAiMessage]);
     } catch (error) {
-      setApiError("Erreur de connexion avec l'IA. Vérifiez votre connexion.");
+      setApiError("Erreur de connexion avec l'IA.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col font-sans selection:bg-[#ccff00]/30">
+    <div className="flex flex-col h-full min-h-[70vh] relative">
       
-      <div className="bg-[#121212] border-b border-[#ccff00]/20 p-5 sticky top-0 z-20 shadow-[0_4px_30px_rgba(204,255,0,0.05)]">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-white flex items-center gap-3 tracking-wide">
-              <span className="text-[#ccff00]">✦</span> GrindMind
-            </h1>
-            <p className="text-[10px] md:text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">
-              Logique • Vérité • Clarté
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLoading ? 'bg-[#ccff00]' : 'bg-[#ccff00]/50'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLoading ? 'bg-[#ccff00]' : 'bg-[#ccff00]/50'}`}></span>
-            </span>
-          </div>
+      {/* En-tête de la page Mental intégré au thème */}
+      <div className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-2xl mb-6 flex justify-between items-center shadow-lg">
+        <div>
+          <h2 className="text-xl font-black text-white flex items-center gap-2">
+            <span className="text-[#ccff00]">✦</span> GrindMind
+          </h2>
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">
+            Logique • Vérité
+          </p>
         </div>
+        {isLoading && (
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ccff00] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#ccff00]"></span>
+          </span>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32 max-w-4xl mx-auto w-full">
+      {/* Zone des messages (qui prend tout l'espace restant) */}
+      <div className="flex-1 space-y-4 mb-4">
         {messages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}
-          >
-            <div 
-              className={`max-w-[85%] md:max-w-[75%] p-4 text-sm md:text-base leading-relaxed shadow-lg whitespace-pre-wrap ${
-                msg.sender === 'user' 
-                  ? 'bg-[#ccff00] text-black font-semibold rounded-2xl rounded-br-sm' 
-                  : 'bg-[#1a1a1a] text-gray-200 border border-gray-800 rounded-2xl rounded-bl-sm font-medium'
-              }`}
-            >
+          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+            <div className={`max-w-[85%] p-3.5 text-sm leading-relaxed shadow-lg whitespace-pre-wrap ${
+              msg.sender === 'user' 
+                ? 'bg-[#ccff00] text-black font-bold rounded-2xl rounded-br-sm' 
+                : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-2xl rounded-bl-sm font-medium'
+            }`}>
               {msg.text}
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="flex justify-start animate-fade-in-up">
-            <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl rounded-bl-sm p-5 flex gap-2 items-center shadow-lg">
-              <div className="w-2 h-2 bg-[#ccff00] rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-[#ccff00] rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-              <div className="w-2 h-2 bg-[#ccff00] rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-sm p-4 flex gap-2 items-center shadow-lg">
+              <div className="w-1.5 h-1.5 bg-[#ccff00] rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-[#ccff00] rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+              <div className="w-1.5 h-1.5 bg-[#ccff00] rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
             </div>
           </div>
         )}
 
         {apiError && (
-          <div className="flex justify-center my-4 animate-fade-in-up">
-            <div className="bg-red-950/50 border border-red-900/50 text-red-400 text-xs font-bold uppercase tracking-wider py-2 px-4 rounded-lg flex items-center gap-2">
-              <span>⚠️</span> {apiError}
-            </div>
+          <div className="bg-red-950/50 border border-red-900/50 text-red-400 text-[10px] font-bold uppercase tracking-wider py-2 px-3 rounded-xl flex items-center justify-center gap-2">
+            ⚠️ {apiError}
           </div>
         )}
-
-        <div ref={messagesEndRef} />
+        
+        {/* Un repère invisible pour que ça scroll tout en bas automatiquement */}
+        <div ref={messagesEndRef} className="h-2" />
       </div>
 
-      <div className="bg-[#121212]/90 backdrop-blur-md border-t border-gray-900/80 p-4 fixed bottom-0 w-full z-20">
-        <div className="max-w-4xl mx-auto">
-          <form onSubmit={handleSendMessage} className="flex gap-3 relative items-end">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              placeholder="Pose ta question ou exprime tes doutes..."
-              className="flex-1 bg-[#0a0a0a] text-white border border-gray-800 rounded-xl py-3.5 px-5 outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/50 transition-all resize-none max-h-32 min-h-[52px] placeholder:text-gray-600 font-medium"
-              rows={inputMessage.split('\n').length > 1 ? Math.min(inputMessage.split('\n').length, 3) : 1}
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !inputMessage.trim()}
-              className="bg-[#ccff00] hover:bg-[#b3e600] disabled:bg-[#ccff00]/10 disabled:text-[#ccff00]/30 text-black h-[52px] px-6 rounded-xl transition-all font-black flex items-center justify-center uppercase tracking-wider text-sm shadow-[0_0_15px_rgba(204,255,0,0.1)] disabled:shadow-none shrink-0"
-            >
-              Envoyer
-            </button>
-          </form>
-        </div>
+      {/* Barre d'écriture fixée en bas du container (pas de l'écran) */}
+      <div className="sticky bottom-0 bg-[#0f172a] pt-2 pb-2 z-10 border-t border-slate-800/80 mt-auto">
+        <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Écris ton message..."
+            className="flex-1 bg-slate-800/80 text-white border border-slate-700 rounded-xl px-4 py-3 text-sm focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/50 outline-none transition-all placeholder:text-slate-500"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !inputMessage.trim()}
+            className="bg-[#ccff00] disabled:bg-slate-800 disabled:text-slate-600 text-black px-5 rounded-xl font-black uppercase tracking-wider text-xs transition-colors shrink-0 flex items-center justify-center"
+          >
+            Envoyer
+          </button>
+        </form>
       </div>
 
     </div>
