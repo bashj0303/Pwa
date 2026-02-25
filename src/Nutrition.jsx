@@ -20,130 +20,185 @@ const DB = {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// ─── Composant Scanner (monte/démonte html5-qrcode) ──────────────────────────
+// ─── Composant Scanner ZXing (rapide, précis, industriel) ────────────────────
 const BarcodeScanner = ({ onDetected, onClose, isFr }) => {
-  const scannerRef = useRef(null);
-  const html5QrRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const readerRef = useRef(null);
+  const detectedRef = useRef(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hint, setHint] = useState(false);
 
   useEffect(() => {
-    // Charger html5-qrcode dynamiquement
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-    script.async = true;
-    script.onload = () => startScanner();
-    script.onerror = () => setError(isFr ? 'Impossible de charger le scanner.' : 'Failed to load scanner.');
-    document.head.appendChild(script);
+    let cancelled = false;
 
-    return () => {
-      stopScanner();
-      // Ne pas supprimer le script car il peut être réutilisé
+    const loadZxing = () => new Promise((resolve, reject) => {
+      if (window.ZXing) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+
+    const start = async () => {
+      try {
+        await loadZxing();
+        if (cancelled) return;
+
+        const hints = new Map();
+        // Formats courants pour les aliments (EAN-13, UPC-A, EAN-8, UPC-E, DataMatrix, QR)
+        hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          window.ZXing.BarcodeFormat.EAN_13,
+          window.ZXing.BarcodeFormat.UPC_A,
+          window.ZXing.BarcodeFormat.EAN_8,
+          window.ZXing.BarcodeFormat.UPC_E,
+          window.ZXing.BarcodeFormat.DATA_MATRIX,
+          window.ZXing.BarcodeFormat.QR_CODE,
+          window.ZXing.BarcodeFormat.CODE_128,
+        ]);
+        hints.set(window.ZXing.DecodeHintType.TRY_HARDER, true);
+
+        const reader = new window.ZXing.BrowserMultiFormatReader(hints, 200);
+        readerRef.current = reader;
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          setLoading(false);
+        }
+
+        // Boucle de décodage rapide avec requestAnimationFrame
+        const decode = async () => {
+          if (cancelled || detectedRef.current || !videoRef.current) return;
+          try {
+            const result = await reader.decodeOnce(videoRef.current);
+            if (!cancelled && !detectedRef.current && result?.getText()) {
+              detectedRef.current = true;
+              stopAll();
+              onDetected(result.getText());
+            }
+          } catch (e) {
+            // Pas de code détecté ce frame, on réessaie
+            if (!cancelled && !detectedRef.current) {
+              setTimeout(decode, 150);
+            }
+          }
+        };
+        decode();
+
+        // Hint "bouge légèrement" après 5s si rien trouvé
+        setTimeout(() => { if (!detectedRef.current && !cancelled) setHint(true); }, 5000);
+
+      } catch (e) {
+        if (!cancelled) {
+          if (e.name === 'NotAllowedError') setError(isFr ? 'Permission caméra refusée.' : 'Camera permission denied.');
+          else setError(isFr ? 'Impossible d\'accéder à la caméra.' : 'Cannot access camera.');
+          setLoading(false);
+        }
+      }
     };
+
+    start();
+    return () => { cancelled = true; stopAll(); };
   }, []);
 
-  const startScanner = () => {
-    if (!window.Html5Qrcode) return;
-    try {
-      const scanner = new window.Html5Qrcode('barcode-reader');
-      html5QrRef.current = scanner;
-      scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 120 } },
-        (decodedText) => {
-          stopScanner();
-          onDetected(decodedText);
-        },
-        () => {} // ignore scan errors silencieux
-      ).then(() => setLoading(false))
-       .catch(err => setError(isFr ? 'Accès caméra refusé.' : 'Camera access denied.'));
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  const stopScanner = () => {
-    if (html5QrRef.current) {
-      html5QrRef.current.stop().catch(() => {});
-      html5QrRef.current = null;
-    }
-  };
-
-  const handleClose = () => {
-    stopScanner();
-    onClose();
+  const stopAll = () => {
+    if (readerRef.current) { try { readerRef.current.reset(); } catch {} readerRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-sm">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h3 className="text-white font-black text-lg flex items-center gap-2">
-              <ScanLine className="text-[#ccff00]" size={22} />
-              {isFr ? 'Scanner un produit' : 'Scan a Product'}
-            </h3>
-            <p className="text-slate-400 text-xs mt-0.5">
-              {isFr ? 'Pointe la caméra vers le code-barres' : 'Point camera at barcode'}
-            </p>
+    <div className="fixed inset-0 bg-black z-50 flex flex-col animate-in fade-in duration-200">
+      {/* Vidéo plein écran */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        muted playsInline autoPlay
+      />
+
+      {/* Overlay sombre sur les bords */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-black/50" />
+        {/* Fenêtre transparente au centre */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-72 h-28 bg-transparent rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+        </div>
+      </div>
+
+      {/* Cadre de scan animé */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-72 h-28 relative">
+          {/* Coins */}
+          {[['top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-xl'],
+            ['top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-xl'],
+            ['bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-xl'],
+            ['bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-xl']
+          ].map(([cls], i) => (
+            <div key={i} className={`absolute w-7 h-7 border-[#ccff00] ${cls}`} />
+          ))}
+          {/* Laser */}
+          <div className="absolute left-2 right-2 h-[2px] bg-[#ccff00] shadow-[0_0_8px_2px_rgba(204,255,0,0.7)]"
+            style={{ animation: 'laserScan 1.8s ease-in-out infinite', top: '50%' }} />
+        </div>
+      </div>
+
+      {/* Loading spinner */}
+      {loading && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+          <div className="text-center">
+            <Loader2 className="animate-spin text-[#ccff00] mx-auto mb-3" size={40} />
+            <p className="text-white font-bold text-sm">{isFr ? 'Activation caméra...' : 'Starting camera...'}</p>
           </div>
-          <button
-            onClick={handleClose}
-            className="bg-slate-800 p-2.5 rounded-full text-slate-400 hover:text-white hover:bg-red-500/30 transition-colors border border-slate-700"
-          >
-            <X size={20} />
-          </button>
         </div>
+      )}
 
-        {/* Zone de scan */}
-        <div className="relative bg-slate-900 rounded-3xl overflow-hidden border-2 border-[#ccff00]/30 shadow-[0_0_40px_rgba(204,255,0,0.1)]">
-          {loading && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-slate-900/90">
-              <Loader2 className="animate-spin text-[#ccff00] mb-3" size={36} />
-              <p className="text-white text-sm font-bold">{isFr ? 'Activation caméra...' : 'Starting camera...'}</p>
-            </div>
-          )}
-          {error && (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <Camera size={40} className="text-red-400 mb-3" />
-              <p className="text-red-400 font-bold text-sm">{error}</p>
-              <p className="text-slate-500 text-xs mt-2">{isFr ? 'Vérifie les permissions caméra.' : 'Check camera permissions.'}</p>
-            </div>
-          )}
-
-          {/* Viewfinder */}
-          <div id="barcode-reader" className="w-full" style={{ minHeight: '260px' }} ref={scannerRef} />
-
-          {/* Laser overlay */}
-          {!loading && !error && (
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-[80px] border-2 border-[#ccff00]/70 rounded-lg relative shadow-[0_0_15px_rgba(204,255,0,0.3)]">
-                {/* Coins */}
-                <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-[#ccff00] rounded-tl" />
-                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-[#ccff00] rounded-tr" />
-                <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-[#ccff00] rounded-bl" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-2 border-r-2 border-[#ccff00] rounded-br" />
-                {/* Laser line animé */}
-                <div className="absolute left-1 right-1 h-0.5 bg-[#ccff00]/80 shadow-[0_0_6px_#ccff00] animate-[scan_2s_ease-in-out_infinite]"
-                  style={{ animation: 'scanLine 2s ease-in-out infinite' }} />
-              </div>
-            </div>
-          )}
+      {/* Erreur */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-10 p-6">
+          <div className="text-center">
+            <Camera size={48} className="text-red-400 mx-auto mb-4" />
+            <p className="text-red-400 font-black text-base mb-2">{error}</p>
+            <p className="text-slate-400 text-sm">{isFr ? 'Vérifie les permissions de ton navigateur.' : 'Check your browser permissions.'}</p>
+          </div>
         </div>
+      )}
 
-        <p className="text-center text-slate-500 text-[10px] mt-3 font-bold uppercase tracking-wider">
-          {isFr ? 'Compatible avec tous les codes-barres alimentaires' : 'Works with all food barcodes'}
+      {/* UI du bas */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent">
+        {hint && (
+          <p className="text-center text-[#ccff00] text-xs font-bold mb-3 animate-pulse">
+            {isFr ? '💡 Bouge légèrement le cell ou ajuste la distance' : '💡 Move phone slightly or adjust distance'}
+          </p>
+        )}
+        <p className="text-center text-white/60 text-xs mb-4">
+          {isFr ? 'Place le code-barres dans le cadre' : 'Align barcode within the frame'}
         </p>
+        <button
+          onClick={() => { stopAll(); onClose(); }}
+          className="w-full bg-slate-800/90 border border-slate-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 backdrop-blur-sm"
+        >
+          <X size={18} /> {isFr ? 'Annuler' : 'Cancel'}
+        </button>
       </div>
 
       <style>{`
-        @keyframes scanLine {
-          0%, 100% { top: 4px; opacity: 1; }
-          50% { top: calc(100% - 6px); opacity: 0.8; }
+        @keyframes laserScan {
+          0%   { transform: translateY(-28px); opacity: 1; }
+          50%  { transform: translateY(28px);  opacity: 0.9; }
+          100% { transform: translateY(-28px); opacity: 1; }
         }
-        #barcode-reader video { border-radius: 0 !important; }
-        #barcode-reader canvas { display: none !important; }
       `}</style>
     </div>
   );
@@ -246,84 +301,84 @@ const Nutrition = ({ t }) => {
   // ── Handler Open Food Facts ──────────────────────────────────────────────
   const handleBarcodeDetected = async (barcode) => {
     setShowScanner(false);
-    // Nettoyer le code (enlever espaces, caractères invisibles)
     const cleanBarcode = barcode.trim().replace(/[^0-9]/g, '');
     setScannedCode(cleanBarcode);
     setScanStatus('loading');
 
-    // URLs à essayer dans l'ordre
     const urls = [
-      `https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}?fields=product_name,product_name_fr,brands,serving_size,nutriments`,
+      `https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}?fields=product_name,product_name_fr,product_name_en,brands,serving_size,serving_quantity,nutriments`,
       `https://world.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`,
     ];
 
-    let lastError = null;
-
     for (const url of urls) {
       try {
-        const res = await fetch(url, {
-          headers: { 'User-Agent': 'GrindupPro/1.0' }
-        });
-
+        const res = await fetch(url, { headers: { 'User-Agent': 'GrindupPro/1.0' } });
         if (!res.ok) continue;
-
         const data = await res.json();
-
         if (data.status !== 1 || !data.product) continue;
 
         const p = data.product;
         const n = p.nutriments || {};
 
-        // Essayer toutes les variantes de clés nutritionnelles
-        const per100 = (key) => {
-          const val = n[`${key}_100g`] ?? n[key] ?? n[`${key}-100g`] ?? 0;
-          return Number(Number(val).toFixed(1));
+        // ── Toujours utiliser les valeurs _100g (jamais _serving qui varie) ──
+        const get100 = (key) => {
+          // Priorité : key_100g → key-100g → key (fallback)
+          const v = n[`${key}_100g`] ?? n[`${key}-100g`] ?? null;
+          return v !== null ? Number(Number(v).toFixed(2)) : null;
         };
 
-        // Calories : essayer energy-kcal puis energy (kJ → kcal)
-        let kcal = per100('energy-kcal');
-        if (!kcal || kcal === 0) {
-          const kj = per100('energy');
-          kcal = kj ? Number((kj / 4.184).toFixed(0)) : 0;
+        // ── Calories : toujours en kcal ──
+        let kcal100 = get100('energy-kcal');
+        if (kcal100 === null || kcal100 === 0) {
+          // Essayer energy-kj_100g puis energy_100g et convertir
+          const kj = get100('energy-kj') ?? get100('energy');
+          if (kj && kj > 0) kcal100 = Number((kj / 4.184).toFixed(1));
+          else kcal100 = 0;
         }
 
+        const proteins100 = get100('proteins') ?? 0;
+        const carbs100    = get100('carbohydrates') ?? 0;
+        const fat100      = get100('fat') ?? 0;
+
+        // ── Nom du produit ──
         const productName =
           p.product_name_fr ||
-          p.product_name ||
+          p.product_name_en ||
+          p.product_name    ||
           p.generic_name_fr ||
-          p.generic_name ||
+          p.generic_name    ||
           (isFr ? 'Produit scanné' : 'Scanned product');
 
-        // Extraire la portion en grammes si dispo
+        // ── Portion : extraire les grammes si disponible ──
         let servingGrams = null;
-        if (p.serving_size) {
+        const servingQty = p.serving_quantity; // champ numérique direct si dispo
+        if (servingQty && Number(servingQty) > 0) {
+          servingGrams = String(Math.round(Number(servingQty)));
+        } else if (p.serving_size) {
           const match = p.serving_size.match(/(\d+(?:[.,]\d+)?)\s*g/i);
-          if (match) servingGrams = match[1].replace(',', '.');
+          if (match) servingGrams = String(Math.round(Number(match[1].replace(',', '.'))));
         }
 
         setScannedProduct({
           name: productName,
           brand: p.brands || '',
-          k100: kcal,
-          p100: per100('proteins'),
-          c100: per100('carbohydrates'),
-          f100: per100('fat'),
+          k100: kcal100,
+          p100: proteins100,
+          c100: carbs100,
+          f100: fat100,
           servingSize: servingGrams,
           rawBarcode: cleanBarcode,
         });
         setScanQty(servingGrams || '100');
         setScanStatus(null);
         setScannedCode(null);
-        return; // succès, on arrête
+        return;
 
       } catch (e) {
-        lastError = e;
         continue;
       }
     }
 
-    // Toutes les tentatives ont échoué
-    console.error('Barcode lookup failed for:', cleanBarcode, lastError);
     setScanStatus('notfound');
     setTimeout(() => { setScanStatus(null); setScannedCode(null); }, 4000);
   };
