@@ -32,14 +32,11 @@ export default function Mental() {
 
   // L'APPEL À L'API
   const callGeminiChatAPI = async (chatHistory) => {
-    // Ta clé (Attention : ne la partage jamais publiquement une fois ton site en ligne !)
-    // On récupère la clé secrète depuis le fichier .env
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
+    // ⚠️ La clé est récupérée dynamiquement et de manière sécurisée via Vercel
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
     
-    // L'adresse officielle
+    // L'adresse de l'API avec le modèle standard (gemini-1.5-flash)
     const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
-
-    console.log("On appelle cette adresse :", url);
 
     // Formatage de l'historique
     let formattedContents = [];
@@ -72,15 +69,13 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Détails de l'erreur Google :", errorData);
         throw new Error(`Erreur de l'API (${response.status})`);
       }
 
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je suis à court de mots.";
     } catch (err) {
-      console.error("Crash total :", err);
+      console.error("Crash de la connexion à l'IA :", err);
       throw err; 
     }
   };
@@ -110,7 +105,7 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       setMessages((prev) => [...prev, newAiMessage]);
     } catch (error) {
-      setApiError("Erreur de connexion (Regarde la touche F12 pour les détails).");
+      setApiError("Erreur de connexion avec l'IA. Vérifiez votre connexion.");
     } finally {
       setIsLoading(false);
     }
