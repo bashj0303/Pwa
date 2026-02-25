@@ -246,44 +246,86 @@ const Nutrition = ({ t }) => {
   // ── Handler Open Food Facts ──────────────────────────────────────────────
   const handleBarcodeDetected = async (barcode) => {
     setShowScanner(false);
-    setScannedCode(barcode);
+    // Nettoyer le code (enlever espaces, caractères invisibles)
+    const cleanBarcode = barcode.trim().replace(/[^0-9]/g, '');
+    setScannedCode(cleanBarcode);
     setScanStatus('loading');
 
-    try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-      const data = await res.json();
+    // URLs à essayer dans l'ordre
+    const urls = [
+      `https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}?fields=product_name,product_name_fr,brands,serving_size,nutriments`,
+      `https://world.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`,
+    ];
 
-      if (data.status !== 1 || !data.product) {
-        setScanStatus('notfound');
-        setTimeout(() => { setScanStatus(null); setScannedCode(null); }, 3000);
-        return;
+    let lastError = null;
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'GrindupPro/1.0' }
+        });
+
+        if (!res.ok) continue;
+
+        const data = await res.json();
+
+        if (data.status !== 1 || !data.product) continue;
+
+        const p = data.product;
+        const n = p.nutriments || {};
+
+        // Essayer toutes les variantes de clés nutritionnelles
+        const per100 = (key) => {
+          const val = n[`${key}_100g`] ?? n[key] ?? n[`${key}-100g`] ?? 0;
+          return Number(Number(val).toFixed(1));
+        };
+
+        // Calories : essayer energy-kcal puis energy (kJ → kcal)
+        let kcal = per100('energy-kcal');
+        if (!kcal || kcal === 0) {
+          const kj = per100('energy');
+          kcal = kj ? Number((kj / 4.184).toFixed(0)) : 0;
+        }
+
+        const productName =
+          p.product_name_fr ||
+          p.product_name ||
+          p.generic_name_fr ||
+          p.generic_name ||
+          (isFr ? 'Produit scanné' : 'Scanned product');
+
+        // Extraire la portion en grammes si dispo
+        let servingGrams = null;
+        if (p.serving_size) {
+          const match = p.serving_size.match(/(\d+(?:[.,]\d+)?)\s*g/i);
+          if (match) servingGrams = match[1].replace(',', '.');
+        }
+
+        setScannedProduct({
+          name: productName,
+          brand: p.brands || '',
+          k100: kcal,
+          p100: per100('proteins'),
+          c100: per100('carbohydrates'),
+          f100: per100('fat'),
+          servingSize: servingGrams,
+          rawBarcode: cleanBarcode,
+        });
+        setScanQty(servingGrams || '100');
+        setScanStatus(null);
+        setScannedCode(null);
+        return; // succès, on arrête
+
+      } catch (e) {
+        lastError = e;
+        continue;
       }
-
-      const p = data.product;
-      const n = p.nutriments || {};
-      const per100 = (key) => Number((n[key + '_100g'] || n[key] || 0).toFixed(1));
-
-      const productName = p.product_name || p.product_name_fr || p.generic_name || (isFr ? 'Produit scanné' : 'Scanned product');
-      const servingSize = p.serving_size || null;
-
-      // Stocker les données /100g + ouvrir modal quantité
-      setScannedProduct({
-        name: productName,
-        brand: p.brands || '',
-        k100: per100('energy-kcal'),
-        p100: per100('proteins'),
-        c100: per100('carbohydrates'),
-        f100: per100('fat'),
-        servingSize,
-      });
-      setScanQty('100');
-      setScanStatus(null);
-      setScannedCode(null);
-
-    } catch (e) {
-      setScanStatus('error');
-      setTimeout(() => { setScanStatus(null); setScannedCode(null); }, 3000);
     }
+
+    // Toutes les tentatives ont échoué
+    console.error('Barcode lookup failed for:', cleanBarcode, lastError);
+    setScanStatus('notfound');
+    setTimeout(() => { setScanStatus(null); setScannedCode(null); }, 4000);
   };
 
   // ── Confirmer ajout avec quantité choisie ──────────────────────────────
@@ -597,19 +639,24 @@ const Nutrition = ({ t }) => {
         </div>
       )}
 
-      {/* Toast de résultat scan */}
       {scanStatus && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl font-bold text-sm shadow-2xl flex items-center gap-2 animate-in slide-in-from-top duration-300 border ${
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl font-bold text-sm shadow-2xl flex flex-col items-center gap-1 animate-in slide-in-from-top duration-300 border max-w-[90vw] ${
           scanStatus === 'loading' ? 'bg-slate-800 border-slate-700 text-white' :
           scanStatus === 'success' ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-300' :
           'bg-red-900/90 border-red-500/50 text-red-300'
         }`}>
-          {scanStatus === 'loading' && <Loader2 size={16} className="animate-spin text-[#ccff00]" />}
-          {scanStatus === 'loading' && vocab.scanLoading}
-          {scanStatus === 'success' && vocab.scanSuccess}
-          {scanStatus === 'notfound' && vocab.scanNotFound}
-          {scanStatus === 'error' && vocab.scanError}
-          {scannedCode && scanStatus === 'loading' && <span className="text-[10px] text-slate-400 ml-1">{scannedCode}</span>}
+          <div className="flex items-center gap-2">
+            {scanStatus === 'loading' && <Loader2 size={16} className="animate-spin text-[#ccff00]" />}
+            {scanStatus === 'loading' && <span>{vocab.scanLoading}</span>}
+            {scanStatus === 'success' && <span>{vocab.scanSuccess}</span>}
+            {scanStatus === 'notfound' && <span>{vocab.scanNotFound}</span>}
+            {scanStatus === 'error' && <span>{vocab.scanError}</span>}
+          </div>
+          {scannedCode && (
+            <span className="text-[10px] text-slate-400 font-mono bg-black/30 px-2 py-0.5 rounded">
+              Code: {scannedCode}
+            </span>
+          )}
         </div>
       )}
 
